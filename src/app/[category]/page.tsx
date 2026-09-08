@@ -1,0 +1,56 @@
+import { notFound } from "next/navigation";
+import { categories, getProjectsByCategory, site } from "@/content/site";
+import { ProjectGrid } from "@/components/ProjectCard";
+
+export function generateStaticParams() {
+  return categories.map((category) => ({ category: category.slug }));
+}
+
+export async function generateMetadata({ params }: PageProps<"/[category]">) {
+  const { category } = await params;
+  const meta = categories.find((item) => item.slug === category);
+  return {
+    title: meta ? `${meta.label} | Daksh Kumar` : "Daksh Kumar",
+  };
+}
+
+export default async function CategoryPage({ params }: PageProps<"/[category]">) {
+  const { category } = await params;
+  const meta = categories.find((item) => item.slug === category);
+
+  if (!meta) notFound();
+
+  const items = getProjectsByCategory(category);
+
+  return (
+    <>
+      <section className="work-hero" style={{ textAlign: "center" }}>
+        <h1 className="serif" style={{ fontSize: 52, letterSpacing: "-0.04em" }}>
+          {meta.label}
+        </h1>
+        <p>Things that live in this corner of my brain.</p>
+        {category === "dev" ? (
+          <a
+            href={site.github}
+            target="_blank"
+            rel="noreferrer"
+            className="github-link"
+          >
+            <GitHubIcon />
+            View on GitHub
+          </a>
+        ) : null}
+      </section>
+      <div style={{ height: 36 }} />
+      <ProjectGrid projects={items} />
+    </>
+  );
+}
+
+function GitHubIcon() {
+  return (
+    <svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+      <path d="M12 .5C5.73.5.5 5.73.5 12c0 5.08 3.29 9.39 7.86 10.91.57.1.78-.25.78-.55 0-.27-.01-1.17-.02-2.12-3.2.7-3.88-1.36-3.88-1.36-.52-1.34-1.28-1.69-1.28-1.69-1.05-.72.08-.71.08-.71 1.16.08 1.77 1.19 1.77 1.19 1.03 1.77 2.7 1.26 3.36.96.1-.75.4-1.26.73-1.55-2.55-.29-5.23-1.28-5.23-5.68 0-1.26.45-2.28 1.19-3.08-.12-.29-.52-1.46.11-3.05 0 0 .97-.31 3.18 1.18a11 11 0 0 1 5.79 0c2.2-1.49 3.17-1.18 3.17-1.18.64 1.59.24 2.76.12 3.05.74.8 1.18 1.82 1.18 3.08 0 4.41-2.68 5.38-5.24 5.67.41.36.78 1.06.78 2.14 0 1.54-.01 2.79-.01 3.17 0 .3.2.66.79.55A10.52 10.52 0 0 0 23.5 12C23.5 5.73 18.27.5 12 .5Z" />
+    </svg>
+  );
+}
