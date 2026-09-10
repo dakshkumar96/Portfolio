@@ -2,6 +2,8 @@ This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-
 
 ## Getting Started
 
+Builiding 3d portfolio website
+
 First, run the development server:
 
 ```bash
