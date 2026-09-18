@@ -1,0 +1,11 @@
+Model Information:
+* title:	Samsung A3
+* source:	https://sketchfab.com/3d-models/samsung-a3-50386f953cdb4b4d86060c146d8683b7
+* author:	The Latest Shit (https://sketchfab.com/thelatestshit)
+
+Model License:
+* license type:	CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+* requirements:	Author must be credited. Commercial use is allowed.
+
+If you use this 3D model in your project be sure to copy paste this credit wherever you share it:
+This work is based on "Samsung A3" (https://sketchfab.com/3d-models/samsung-a3-50386f953cdb4b4d86060c146d8683b7) by The Latest Shit (https://sketchfab.com/thelatestshit) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
