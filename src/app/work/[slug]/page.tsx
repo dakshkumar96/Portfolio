@@ -44,6 +44,20 @@ export default async function WorkPage({ params }: PageProps<"/work/[slug]">) {
             <li key={item}>{item}</li>
           ))}
         </ul>
+        {project.live || project.repo ? (
+          <div className="tag-row" style={{ marginTop: 28 }}>
+            {project.live ? (
+              <a className="tag" href={project.live} target="_blank" rel="noreferrer">
+                Visit the live site ↗
+              </a>
+            ) : null}
+            {project.repo ? (
+              <a className="tag" href={project.repo} target="_blank" rel="noreferrer">
+                View the code ↗
+              </a>
+            ) : null}
+          </div>
+        ) : null}
         <div className="tag-row" style={{ marginTop: 28 }}>
           {project.stack.map((item) => (
             <span key={item} className="tag">

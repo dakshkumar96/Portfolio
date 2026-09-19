@@ -86,7 +86,11 @@ export const projectExhibits: ExhibitDatum[] = projects
     meta: `${project.stack.join(" · ")} · ${project.year}`,
     body: project.summary,
     bullets: project.highlights,
-    links: [{ label: "Open case study", href: `/work/${project.slug}` }],
+    links: [
+      { label: "Open case study", href: `/work/${project.slug}` },
+      ...(project.live ? [{ label: "Live site", href: project.live, external: true }] : []),
+      ...(project.repo ? [{ label: "Code", href: project.repo, external: true }] : []),
+    ],
   }));
 
 export const skillExhibits: ExhibitDatum[] = skills.map((group) => ({

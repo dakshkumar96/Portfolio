@@ -46,6 +46,10 @@ export type Project = {
   featured: boolean;
   year: string;
   status: string;
+  /** The live product, where there is one to click. */
+  live?: string;
+  /** The public repository, where the code is open. */
+  repo?: string;
 };
 
 export const projects: Project[] = [
