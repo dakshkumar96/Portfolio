@@ -39,3 +39,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# raw 3D sources — the app only ever serves the exports in public/models
+/3d models for glass boxes/
