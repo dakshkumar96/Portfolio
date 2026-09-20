@@ -18,6 +18,20 @@ const instrument = Instrument_Serif({
 export const metadata = {
   title: site.headline,
   description: site.description,
+  openGraph: {
+    title: site.headline,
+    description: site.description,
+    siteName: site.name,
+    type: "website",
+    locale: "en_GB",
+  },
+  twitter: {
+    // stays "summary" until there is a 1200x630 image to point at;
+    // claiming summary_large_image without one just renders nothing
+    card: "summary",
+    title: site.headline,
+    description: site.description,
+  },
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
