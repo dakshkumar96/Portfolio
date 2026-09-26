@@ -114,7 +114,7 @@ let marbleCache: THREE.Texture | null = null;
 export function getMarble(): THREE.Texture | null {
   if (marbleCache) return marbleCache;
 
-  const size = 1024;
+  const size = 512;
   const canvas = document.createElement("canvas");
   canvas.width = canvas.height = size;
   const ctx = canvas.getContext("2d", { willReadFrequently: true });
@@ -271,10 +271,56 @@ export function getScriptWall(): THREE.Texture | null {
  * Cheaper than shipping an image and keeps the surface detail coherent
  * with the colour map it came from.
  */
+/**
+ * NOTE ON TEXTURE SIZE
+ *
+ * The generators in this file build their canvases at 512, not 1024.
+ *
+ * Fourteen of them were a megapixel each, and every one is filled by
+ * per-pixel JavaScript — drawing loops, getImageData, a Sobel pass —
+ * on the main thread, in the frame the scene mounts. Measured, that one
+ * frame took 5.4 seconds.
+ *
+ * Halving the side quarters the work and quarters the VRAM. Nothing
+ * here is read at its own scale: these are tiling surfaces on walls,
+ * floors and ceilings seen at a distance with `repeat` applied, so the
+ * texel density that actually reaches the screen is set by the tiling,
+ * not by the canvas.
+ */
+
+/**
+ * Derive a tangent-space normal map from a height map.
+ *
+ * Two things here are about cost, not looks, because this runs eleven
+ * times on the main thread while the loading veil is up and the page
+ * cannot paint until it finishes.
+ *
+ * It derives at 512 at most. A normal map carries far lower frequencies
+ * than the albedo it accompanies, so halving a 1024 source is invisible
+ * on a wall while cutting the work to a quarter.
+ *
+ * And the neighbour lookups are plain array reads. This used to call a
+ * closure doing two modulos per sample, eight samples per pixel — about
+ * seventeen million modulo operations per texture. The wrapped column
+ * indices are computed once per row instead.
+ */
 function heightToNormal(src: HTMLCanvasElement, strength = 2.2): THREE.Texture | null {
-  const w = src.width;
-  const h = src.height;
-  const sctx = src.getContext("2d", { willReadFrequently: true });
+  const MAX = 512;
+  let source = src;
+  if (src.width > MAX || src.height > MAX) {
+    const small = document.createElement("canvas");
+    small.width = Math.min(MAX, src.width);
+    small.height = Math.min(MAX, src.height);
+    const sc = small.getContext("2d", { willReadFrequently: true });
+    if (sc) {
+      sc.drawImage(src, 0, 0, small.width, small.height);
+      source = small;
+    }
+  }
+
+  const w = source.width;
+  const h = source.height;
+  const sctx = source.getContext("2d", { willReadFrequently: true });
   if (!sctx) return null;
   const hd = sctx.getImageData(0, 0, w, h).data;
 
@@ -284,21 +330,36 @@ function heightToNormal(src: HTMLCanvasElement, strength = 2.2): THREE.Texture |
   const octx = out.getContext("2d", { willReadFrequently: true });
   if (!octx) return null;
   const img = octx.createImageData(w, h);
+  const od = img.data;
 
-  const at = (x: number, y: number) => {
-    const xi = (x + w) % w;
-    const yi = (y + h) % h;
-    return hd[(yi * w + xi) * 4] / 255;
-  };
+  // wrapped neighbours, resolved once rather than per sample
+  const xm = new Int32Array(w);
+  const xp = new Int32Array(w);
+  for (let x = 0; x < w; x += 1) {
+    xm[x] = x === 0 ? w - 1 : x - 1;
+    xp[x] = x === w - 1 ? 0 : x + 1;
+  }
 
   for (let y = 0; y < h; y += 1) {
+    const rowUp = (y === 0 ? h - 1 : y - 1) * w;
+    const row = y * w;
+    const rowDown = (y === h - 1 ? 0 : y + 1) * w;
+
     for (let x = 0; x < w; x += 1) {
-      const dx =
-        at(x - 1, y - 1) + 2 * at(x - 1, y) + at(x - 1, y + 1) -
-        (at(x + 1, y - 1) + 2 * at(x + 1, y) + at(x + 1, y + 1));
-      const dy =
-        at(x - 1, y - 1) + 2 * at(x, y - 1) + at(x + 1, y - 1) -
-        (at(x - 1, y + 1) + 2 * at(x, y + 1) + at(x + 1, y + 1));
+      const a = xm[x];
+      const b = xp[x];
+
+      const tl = hd[(rowUp + a) * 4];
+      const tc = hd[(rowUp + x) * 4];
+      const tr = hd[(rowUp + b) * 4];
+      const ml = hd[(row + a) * 4];
+      const mr = hd[(row + b) * 4];
+      const bl = hd[(rowDown + a) * 4];
+      const bc = hd[(rowDown + x) * 4];
+      const br = hd[(rowDown + b) * 4];
+
+      const dx = (tl + 2 * ml + bl - (tr + 2 * mr + br)) / 255;
+      const dy = (tl + 2 * tc + tr - (bl + 2 * bc + br)) / 255;
 
       let nx = dx * strength;
       let ny = dy * strength;
@@ -307,11 +368,11 @@ function heightToNormal(src: HTMLCanvasElement, strength = 2.2): THREE.Texture |
       nx /= len;
       ny /= len;
 
-      const i = (y * w + x) * 4;
-      img.data[i] = (nx * 0.5 + 0.5) * 255;
-      img.data[i + 1] = (ny * 0.5 + 0.5) * 255;
-      img.data[i + 2] = (nz / len) * 0.5 * 255 + 127;
-      img.data[i + 3] = 255;
+      const i = (row + x) * 4;
+      od[i] = (nx * 0.5 + 0.5) * 255;
+      od[i + 1] = (ny * 0.5 + 0.5) * 255;
+      od[i + 2] = (nz / len) * 0.5 * 255 + 127;
+      od[i + 3] = 255;
     }
   }
   octx.putImageData(img, 0, 0);
@@ -369,7 +430,7 @@ let carvedCache: { map: THREE.Texture; normalMap: THREE.Texture; roughnessMap: T
 export function getCarvedStone() {
   if (carvedCache) return carvedCache;
 
-  const S = 1024;
+  const S = 512;
   const color = document.createElement("canvas");
   const height = document.createElement("canvas");
   color.width = color.height = height.width = height.height = S;
@@ -628,7 +689,7 @@ let panelCache: PbrFull | null = null;
 export function getPanelPbr(): PbrFull | null {
   if (panelCache) return panelCache;
 
-  const S = 1024;
+  const S = 512;
   const mk = () => {
     const c = document.createElement("canvas");
     c.width = c.height = S;
@@ -808,8 +869,8 @@ let inscriptionCache: { map: THREE.Texture; normalMap: THREE.Texture } | null = 
 export function getInscription(lines: string[]) {
   if (inscriptionCache) return inscriptionCache;
 
-  const W = 1024;
-  const H = 1024;
+  const W = 512;
+  const H = 512;
   const color = document.createElement("canvas");
   const height = document.createElement("canvas");
   color.width = height.width = W;
@@ -901,7 +962,7 @@ let brickCache: BrickSet | null = null;
 export function getBlackBrick(): BrickSet | null {
   if (brickCache) return brickCache;
 
-  const S = 1024;            // 1024px across ~2 metres
+  const S = 512;            // 1024px across ~2 metres
   const PPM = S / 2;         // pixels per metre
   const BRICK_W = 0.215 * PPM;
   const BRICK_H = 0.065 * PPM;
@@ -1047,8 +1108,8 @@ let glowPanelCache: THREE.Texture | null = null;
 export function getGlowPanel(lines: string[]): THREE.Texture | null {
   if (glowPanelCache) return glowPanelCache;
 
-  const W = 1024;
-  const H = 1024;
+  const W = 512;
+  const H = 512;
   const canvas = document.createElement("canvas");
   canvas.width = W;
   canvas.height = H;
@@ -1129,7 +1190,7 @@ export function getCollarBand(label: string): THREE.Texture | null {
   const hit = collarCache.get(label);
   if (hit) return hit;
 
-  const W = 1024;
+  const W = 512;
   const H = 128;
   const canvas = document.createElement("canvas");
   canvas.width = W;
@@ -1177,7 +1238,7 @@ export function getVistaWall(lines: string[]): THREE.Texture | null {
   if (vistaCache) return vistaCache;
 
   const W = 1536;
-  const H = 1024;
+  const H = 512;
   const canvas = document.createElement("canvas");
   canvas.width = W;
   canvas.height = H;
@@ -1274,7 +1335,7 @@ let cladCache: { map: THREE.Texture; normalMap: THREE.Texture; roughnessMap: THR
 export function getCladding() {
   if (cladCache) return cladCache;
 
-  const S = 1024;
+  const S = 512;
   const mk = () => {
     const c = document.createElement("canvas");
     c.width = c.height = S;
@@ -1450,7 +1511,7 @@ let metalGlassCache: { map: THREE.Texture; normalMap: THREE.Texture; roughnessMa
 export function getMetalGlassFloor() {
   if (metalGlassCache) return metalGlassCache;
 
-  const S = 1024;
+  const S = 512;
   const mk = () => {
     const c = document.createElement("canvas");
     c.width = c.height = S;
@@ -1604,7 +1665,7 @@ let slabCache: { map: THREE.Texture; normalMap: THREE.Texture; roughnessMap: THR
 export function getStoneSlab() {
   if (slabCache) return slabCache;
 
-  const S = 1024;
+  const S = 512;
   const mk = () => {
     const c = document.createElement("canvas");
     c.width = c.height = S;
@@ -1963,7 +2024,7 @@ let runeCache: RuneSet | null = null;
 export function getRuneCircuit(): RuneSet | null {
   if (runeCache) return runeCache;
 
-  const S = 1024;
+  const S = 512;
   const mk = () => {
     const c = document.createElement("canvas");
     c.width = c.height = S;
@@ -2167,7 +2228,7 @@ export function getSeamBurst(): THREE.Texture | null {
   if (burstCache) return burstCache;
 
   const W = 512;
-  const H = 1024;
+  const H = 512;
   const canvas = document.createElement("canvas");
   canvas.width = W;
   canvas.height = H;

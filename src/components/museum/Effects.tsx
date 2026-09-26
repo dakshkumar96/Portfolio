@@ -4,13 +4,9 @@ import {
   EffectComposer,
   Bloom,
   Vignette,
-  ChromaticAberration,
-  Noise,
   HueSaturation,
   BrightnessContrast,
 } from "@react-three/postprocessing";
-import { BlendFunction } from "postprocessing";
-import * as THREE from "three";
 
 /**
  * Grade is done with Hue/Saturation + Brightness/Contrast rather than a
@@ -22,15 +18,16 @@ export function Effects() {
     <EffectComposer multisampling={0}>
       <Bloom luminanceThreshold={0.93} luminanceSmoothing={0.2} intensity={0.2} mipmapBlur />
       <Vignette eskil={false} offset={0.3} darkness={0.6} />
-      {/* 0.0008 fringed every edge in frame. An order of magnitude lower,
-          with radial modulation on, keeps it to the extreme corners. */}
-      <ChromaticAberration
-        offset={new THREE.Vector2(0.00009, 0.00009)}
-        blendFunction={BlendFunction.NORMAL}
-        radialModulation
-        modulationOffset={0.62}
-      />
-      <Noise opacity={0.03} blendFunction={BlendFunction.OVERLAY} />
+      {/*
+        Chromatic aberration and film noise used to sit here and have
+        been dropped.
+
+        Both had been tuned down until they were honest — the fringe to
+        an offset of 0.00009 and the grain to 3% opacity — and at those
+        values neither is visible on any display, while each still costs
+        its own full-screen pass every frame. An effect you cannot see is
+        not worth the pixels.
+      */}
       <HueSaturation hue={0.0} saturation={-0.14} />
       <BrightnessContrast brightness={0.01} contrast={0.12} />
     </EffectComposer>

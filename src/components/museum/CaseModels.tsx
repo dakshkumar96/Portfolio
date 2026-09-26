@@ -5,6 +5,7 @@ import { useGLTF } from "@react-three/drei";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import { GOLD, MID } from "./palette";
+import { isShown } from "./visibility";
 
 /**
  * What stands inside each corridor case.
@@ -36,7 +37,8 @@ function Turntable({
   const ref = useRef<THREE.Group>(null);
   useFrame((state, delta) => {
     const g = ref.current;
-    if (!g) return;
+    // nothing to turn if nobody can see it
+    if (!isShown(g)) return;
     if (sweep > 0) {
       g.rotation.y = Math.sin(state.clock.elapsedTime * speed) * sweep;
     } else {
@@ -312,7 +314,7 @@ export function PhoneJ2() {
   return (
     <Suspense fallback={null}>
       <GLBModel
-        url="/models/phone/scene.gltf"
+        url="/models/phone.glb"
         height={0.95}
         /* leaned back on a stand, sweeping rather than spinning */
         spin={0.42}
@@ -330,7 +332,7 @@ export function LaptopHP14() {
   return (
     <Suspense fallback={null}>
       <GLBModel
-        url="/models/laptop/scene.gltf"
+        url="/models/laptop.glb"
         height={1.15}
         spin={0.34}
         sweep={0.6}
@@ -355,7 +357,7 @@ export function BrainAndNeurons() {
   return (
     <Suspense fallback={null}>
       {/* the brain keeps its own scanned materials, so it reads as tissue */}
-      <GLBModel url="/models/brain/scene.gltf" height={1.1} spin={0.2} />
+      <GLBModel url="/models/brain.glb" height={1.1} spin={0.2} />
       {/* neurons orbiting it, in blue */}
       {[0, 1, 2].map((i) => {
         const a = (i / 3) * Math.PI * 2;
@@ -466,7 +468,7 @@ export function CaseContents({ index }: { index: number }) {
   }
 }
 
-useGLTF.preload("/models/phone/scene.gltf");
-useGLTF.preload("/models/laptop/scene.gltf");
-useGLTF.preload("/models/brain/scene.gltf");
+useGLTF.preload("/models/phone.glb");
+useGLTF.preload("/models/laptop.glb");
+useGLTF.preload("/models/brain.glb");
 useGLTF.preload("/models/neuron.glb");

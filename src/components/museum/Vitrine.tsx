@@ -5,6 +5,7 @@ import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import { consumedDrag } from "./lookControls";
 import { GOLD, GOLD_HOT } from "./theme";
+import { isShown } from "./visibility";
 
 export type VitrineShape = "icosahedron" | "sphere" | "octahedron" | "box" | "torus" | "screen";
 
@@ -120,7 +121,7 @@ export function Vitrine({
 
   useFrame((state, delta) => {
     const core = coreRef.current;
-    if (!core) return;
+    if (!isShown(core)) return;
     core.rotation.y += delta * (shape === "screen" ? 0.08 : lit ? 0.7 : 0.26);
     core.position.y = floatBase + Math.sin(state.clock.elapsedTime * 0.9 + seed) * 0.045;
 
@@ -136,7 +137,7 @@ export function Vitrine({
   return (
     <group position={position}>
       {/* pedestal */}
-      <mesh position={[0, height / 2, 0]} castShadow receiveShadow>
+      <mesh position={[0, height / 2, 0]}>
         <boxGeometry args={[caseWidth * 0.92, height, caseWidth * 0.92]} />
         <meshStandardMaterial color="#0e0e10" roughness={0.28} metalness={0.55} />
       </mesh>
@@ -163,7 +164,7 @@ export function Vitrine({
 
       <group ref={coreRef} position={[0, floatBase, 0]}>
         {shape === "screen" && screenTexture ? (
-          <mesh castShadow>
+          <mesh>
             <planeGeometry args={[0.78, 0.49]} />
             <meshStandardMaterial
               map={screenTexture}
@@ -175,7 +176,7 @@ export function Vitrine({
             />
           </mesh>
         ) : shape !== "screen" ? (
-          <mesh castShadow>
+          <mesh>
             <ExhibitGeometry shape={shape} />
             <meshStandardMaterial
               color={GOLD}
@@ -188,8 +189,19 @@ export function Vitrine({
         ) : null}
       </group>
 
-      {/* glass: transmission 1, near-zero roughness, real IOR.
-          This is the click target — the placard only opens from here. */}
+      {/*
+        Glass without transmission. This is the click target — the
+        placard only opens from here.
+
+        `transmission: 1` costs a great deal more than it looks. Three
+        renders transmissive surfaces by drawing the entire scene a
+        second time into an offscreen target and building a mipmap chain
+        for it, every frame that any such surface is in view — so one
+        pane roughly doubles what the GPU does per frame, and it stayed
+        doubled for the rest of the session once a furnished room was
+        behind you. It was also what blurred everything seen through the
+        panes. Opacity and a clearcoat give the same read at this size.
+      */}
       <mesh
         ref={glassRef}
         position={[0, height + caseHeight / 2 + 0.03, 0]}
@@ -206,15 +218,15 @@ export function Vitrine({
       >
         <boxGeometry args={[caseWidth, caseHeight, caseWidth]} />
         <meshPhysicalMaterial
-          transmission={1}
-          thickness={0.35}
+          transmission={0}
           ior={1.5}
-          roughness={0.03}
+          roughness={0.06}
           metalness={0}
           clearcoat={1}
           clearcoatRoughness={0.04}
+          specularIntensity={1}
           transparent
-          opacity={0.92}
+          opacity={0.16}
           color={lit ? "#fff4de" : "#f6ead6"}
         />
       </mesh>
