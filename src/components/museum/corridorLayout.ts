@@ -116,6 +116,42 @@ export function roomView(door: DoorSpec): {
   };
 }
 
+/**
+ * The way in and out of a room, as a route rather than a destination.
+ *
+ * This is the fix for the transition feeling disconnected. Flying the
+ * camera straight at the room's viewing position sends it diagonally
+ * through a solid wall: a long move that passes through stone, arrives
+ * from nowhere, and never once shows you the door you clicked. These
+ * three waypoints make it walk the way a visitor would — square up to
+ * the door, pass through the opening, then step into the room — so the
+ * hall and the chamber read as one connected building.
+ *
+ * Listed outward; the camera follows them in reverse to leave.
+ */
+export function roomPath(door: DoorSpec): {
+  points: [number, number, number][];
+  looks: [number, number, number][];
+} {
+  const dir = door.side === "left" ? -1 : 1;
+  const [cx, cz] = roomCenter(door);
+  const view = roomView(door);
+  return {
+    points: [
+      // out in the hall, squared up in front of the doorway
+      [dir * (HALF_WIDTH - 5.5), CAM_Y, door.z],
+      // in the opening itself
+      [dir * (HALF_WIDTH + 0.8), CAM_Y, door.z],
+      view.position,
+    ],
+    looks: [
+      [dir * HALF_WIDTH, CAM_Y - 0.1, door.z],
+      [cx + dir * ROOM_DEPTH * 0.5, CAM_Y - 0.15, cz],
+      view.look,
+    ],
+  };
+}
+
 export const CAM_Z_START = 17;
 export const CAM_Z_END = Z_FAR + 12;
 /**

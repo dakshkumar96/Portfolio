@@ -1,7 +1,10 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { memo, useEffect, useMemo, useRef, useState } from "react";
+import type { ReactNode } from "react";
 import * as THREE from "three";
+import { useFrame } from "@react-three/fiber";
+import { Instance, Instances } from "@react-three/drei";
 import {
   getVistaWall,
   getGlassSmudge,
@@ -30,6 +33,7 @@ import {
   ROOM_WIDTH,
   ROOM_H,
   roomCenter,
+  CAM_Y,
   DOOR_W,
   DOOR_H,
   DOOR_RECESS,
@@ -121,7 +125,7 @@ const channelY = (height: number) => height - 2.2;
  * door can be seen — and it is also what makes the reveal around each
  * doorway read as genuine wall thickness rather than a painted frame.
  */
-function Walls() {
+function WallsInner() {
   const CHANNEL_Y = channelY(WALL_H);
   /** A little clearance so the wall never clips the archivolt rings. */
   /*
@@ -181,7 +185,6 @@ function Walls() {
                   <mesh
                     position={[sgn * HW, (WALL_H + PLINTH_H) / 2, (lo + hi) / 2]}
                     rotation={[0, yaw, 0]}
-                    receiveShadow
                   >
                     <planeGeometry args={[len, WALL_H - PLINTH_H]} />
                     <CladdingMaterial
@@ -194,7 +197,6 @@ function Walls() {
                   <mesh
                     position={[sgn * (HW - 0.09), PLINTH_H / 2, (lo + hi) / 2]}
                     rotation={[0, yaw, 0]}
-                    receiveShadow
                   >
                     <planeGeometry args={[len, PLINTH_H]} />
                     <meshStandardMaterial
@@ -225,7 +227,6 @@ function Walls() {
                 key={`head${d.z}`}
                 position={[sgn * HW, (HEAD + WALL_H) / 2, d.z]}
                 rotation={[0, yaw, 0]}
-                receiveShadow
               >
                 <planeGeometry args={[DOOR_W + MARGIN * 2, WALL_H - HEAD]} />
                 <CladdingMaterial
@@ -293,11 +294,11 @@ function BrickMaterial({ rx, ry }: { rx: number; ry: number }) {
   );
 }
 
-function Floor() {
+function FloorInner() {
   const [geo, setGeo] = useState<THREE.BufferGeometry | null>(null);
   useUv1(geo);
   return (
-    <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, MID_Z]} receiveShadow>
+    <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, MID_Z]}>
       <planeGeometry ref={setGeo} args={[HW * 2, LENGTH]} />
       <BrickMaterial rx={(HW * 2) / BRICK_TILE} ry={LENGTH / BRICK_TILE} />
     </mesh>
@@ -309,7 +310,7 @@ function RoomFloor({ cx, cz }: { cx: number; cz: number }) {
   const [geo, setGeo] = useState<THREE.BufferGeometry | null>(null);
   useUv1(geo);
   return (
-    <mesh rotation={[-Math.PI / 2, 0, 0]} position={[cx, 0, cz]} receiveShadow>
+    <mesh rotation={[-Math.PI / 2, 0, 0]} position={[cx, 0, cz]}>
       <planeGeometry ref={setGeo} args={[ROOM_DEPTH, ROOM_WIDTH]} />
       <BrickMaterial rx={ROOM_DEPTH / BRICK_TILE} ry={ROOM_WIDTH / BRICK_TILE} />
     </mesh>
@@ -328,7 +329,7 @@ function RoomCeiling({ cx, cz }: { cx: number; cz: number }) {
   const [geo, setGeo] = useState<THREE.BufferGeometry | null>(null);
   useUv1(geo);
   return (
-    <mesh rotation={[Math.PI / 2, 0, 0]} position={[cx, ROOM_H, cz]} receiveShadow>
+    <mesh rotation={[Math.PI / 2, 0, 0]} position={[cx, ROOM_H, cz]}>
       <planeGeometry ref={setGeo} args={[ROOM_DEPTH, ROOM_WIDTH]} />
       <BrickMaterial rx={ROOM_DEPTH / BRICK_TILE} ry={ROOM_WIDTH / BRICK_TILE} />
     </mesh>
@@ -348,11 +349,11 @@ function RoomCeiling({ cx, cz }: { cx: number; cz: number }) {
  * of them put a bright patch on the ceiling above itself — the opposite
  * of what a recessed fitting does. The wall lamps carry the corridor.
  */
-function Ceiling() {
+function CeilingInner() {
   const [geo, setGeo] = useState<THREE.BufferGeometry | null>(null);
   useUv1(geo);
   return (
-    <mesh position={[0, WALL_H, MID_Z]} rotation={[Math.PI / 2, 0, 0]} receiveShadow>
+    <mesh position={[0, WALL_H, MID_Z]} rotation={[Math.PI / 2, 0, 0]}>
       <planeGeometry ref={setGeo} args={[HW * 2, LENGTH]} />
       <BrickMaterial rx={(HW * 2) / BRICK_TILE} ry={LENGTH / BRICK_TILE} />
     </mesh>
@@ -433,7 +434,7 @@ function PoolLight({
  * hall just stops into black. A lit doorway silhouette sits in front of
  * the inscription so there is a destination visible from the entrance.
  */
-function FarFocus() {
+function FarFocusInner() {
   const tex = useMemo(() => getVistaWall(inscriptionLines()), []);
   const OPEN_W = 3.4;
   const OPEN_H = 6.2;
@@ -446,7 +447,7 @@ function FarFocus() {
         panel, which read as a faint patch of script floating in the
         middle of a dark rectangle.
       */}
-      <mesh position={[0, WALL_H / 2, -0.28]} receiveShadow>
+      <mesh position={[0, WALL_H / 2, -0.28]}>
         <planeGeometry args={[HW * 2, WALL_H]} />
         <meshStandardMaterial
           map={tex ?? undefined}
@@ -493,21 +494,21 @@ function FarFocus() {
 
       <group position={[0, 0, 0.6]}>
         {/* stepped plinth */}
-        <mesh position={[0, 0.12, 0]} castShadow receiveShadow>
+        <mesh position={[0, 0.12, 0]}>
           <boxGeometry args={[1.7, 0.24, 1.7]} />
           <meshStandardMaterial color={MID.plinth} roughness={0.7} metalness={0.15} />
         </mesh>
-        <mesh position={[0, 0.5, 0]} castShadow receiveShadow>
+        <mesh position={[0, 0.5, 0]}>
           <cylinderGeometry args={[0.6, 0.68, 0.52, 32]} />
           <meshStandardMaterial color={MID.stone} roughness={0.62} metalness={0.2} />
         </mesh>
 
         {/* the figure */}
-        <mesh position={[0, 1.55, 0]} castShadow>
+        <mesh position={[0, 1.55, 0]}>
           <capsuleGeometry args={[0.3, 1.2, 8, 20]} />
           <meshStandardMaterial color="#b8ac93" roughness={0.88} metalness={0.03} />
         </mesh>
-        <mesh position={[0, 2.55, 0]} castShadow>
+        <mesh position={[0, 2.55, 0]}>
           <sphereGeometry args={[0.25, 24, 24]} />
           <meshStandardMaterial color="#c2b69c" roughness={0.88} metalness={0.03} />
         </mesh>
@@ -516,7 +517,6 @@ function FarFocus() {
             key={sx}
             position={[sx * 0.36, 1.6, 0.05]}
             rotation={[0, 0, sx * 0.22]}
-            castShadow
           >
             <capsuleGeometry args={[0.1, 0.82, 6, 14]} />
             <meshStandardMaterial color="#b0a48c" roughness={0.88} metalness={0.03} />
@@ -525,7 +525,7 @@ function FarFocus() {
 
         {/* the nameplate that settles what it is */}
         <group position={[0, 0.62, 0.72]} rotation={[-0.5, 0, 0]}>
-          <mesh castShadow>
+          <mesh>
             <boxGeometry args={[1.0, 0.3, 0.035]} />
             <meshStandardMaterial
               color={GOLD.metal}
@@ -548,7 +548,6 @@ function FarFocus() {
         angle={0.26}
         distance={16}
         color="#fff2dc"
-        castShadow
       />
       {/* a weak fill so the shaded side is not solid black */}
       <PoolLight
@@ -635,7 +634,7 @@ function DisplayCase({
   return (
     <group position={position}>
       {/* plinth, in brushed metal rather than a flat fill */}
-      <mesh position={[0, PH / 2, 0]} castShadow receiveShadow>
+      <mesh position={[0, PH / 2, 0]}>
         <boxGeometry args={[PW, PH, PW]} />
         <meshStandardMaterial
           color={MID.plinth}
@@ -674,7 +673,7 @@ function DisplayCase({
       </mesh>
 
       {/* the deck: a brushed plate with a projector ring set into it */}
-      <mesh position={[0, PH + 0.012, 0]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
+      <mesh position={[0, PH + 0.012, 0]} rotation={[-Math.PI / 2, 0, 0]}>
         <planeGeometry args={[GW * 0.86, GW * 0.86]} />
         <meshStandardMaterial
           color={MID.stone}
@@ -874,7 +873,7 @@ function DisplayCase({
       ))}
 
       {/* base rail the glass seats into */}
-      <mesh position={[0, PH + 0.055, 0]} castShadow>
+      <mesh position={[0, PH + 0.055, 0]}>
         <boxGeometry args={[GW + 0.09, 0.11, GW + 0.09]} />
         <meshStandardMaterial
           color={MID.bronze}
@@ -885,7 +884,7 @@ function DisplayCase({
       </mesh>
 
       {/* cap rail */}
-      <mesh position={[0, glassY + GH / 2, 0]} castShadow>
+      <mesh position={[0, glassY + GH / 2, 0]}>
         <boxGeometry args={[GW + 0.05, 0.07, GW + 0.05]} />
         <meshStandardMaterial
           color={GOLD.metal}
@@ -907,7 +906,7 @@ function DisplayCase({
           rotation={[0, facing > 0 ? Math.PI / 2 : -Math.PI / 2, 0]}
         >
           <group rotation={[-0.62, 0, 0]}>
-            <mesh castShadow>
+            <mesh>
               <boxGeometry args={[0.92, 0.6, 0.04]} />
               <meshStandardMaterial
                 color={MID.bronze}
@@ -952,7 +951,7 @@ function DisplayCase({
             </mesh>
           </group>
           {/* the stalk it sits on */}
-          <mesh position={[0, -0.34, 0]} castShadow>
+          <mesh position={[0, -0.34, 0]}>
             <cylinderGeometry args={[0.03, 0.035, 0.5, 12]} />
             <meshStandardMaterial color={MID.bronze} roughness={0.35} metalness={0.9} />
           </mesh>
@@ -962,7 +961,7 @@ function DisplayCase({
   );
 }
 
-function Cases({
+function CasesInner({
   activeId,
   onSelect,
 }: {
@@ -1055,7 +1054,7 @@ const INLAY_NODES: { x: number; y: number; s: number }[] = [
  * innermost ring is fully etched circuitry. Walking inward, the stone
  * "wakes up".
  */
-function Door({
+function DoorInner({
   door,
   active,
   onEnter,
@@ -1067,6 +1066,55 @@ function Door({
   const [hovered, setHovered] = useState(false);
   const lit = hovered || active;
   const sgn = door.side === "left" ? -1 : 1;
+
+  /*
+    The leaves swing, and they wait for you.
+
+    Entering a room used to cut: the door stayed shut and the camera
+    passed straight through it. Both halves of that were wrong — you
+    never saw the door you clicked do anything, and the hall and the
+    chamber never visibly joined up.
+
+    Each leaf hangs off its own jamb, which is where the strap hinges
+    below are drawn, so the pivot is the outer edge and they part in the
+    middle the way a real pair does. They open inward, into the room.
+
+    The latch is what keeps them from slamming on the way out: once
+    opened they stay open until the camera is well clear, so you walk
+    back through an open door rather than a closing one.
+  */
+  const pivots = useRef<(THREE.Group | null)[]>([null, null]);
+  const seam = useRef<THREE.MeshStandardMaterial>(null);
+  const swing = useRef(0);
+  const latched = useRef(false);
+  const doorAt = useMemo(
+    () => new THREE.Vector3(doorX(door.side), CAM_Y, door.z),
+    [door.side, door.z],
+  );
+
+  useFrame(({ camera }, delta) => {
+    if (active) latched.current = true;
+    else if (latched.current && camera.position.distanceToSquared(doorAt) > 15 ** 2) {
+      latched.current = false;
+    }
+    // opens faster than it closes, the way a sprung door behaves
+    const rate = latched.current ? 1 / 0.5 : -1 / 0.8;
+    const next = THREE.MathUtils.clamp(swing.current + rate * delta, 0, 1);
+    if (next === swing.current) return;
+    swing.current = next;
+
+    const e = next * next * (3 - 2 * next);
+    const a = e * DOOR_SWING;
+    if (pivots.current[0]) pivots.current[0].rotation.y = a;
+    if (pivots.current[1]) pivots.current[1].rotation.y = -a;
+    /*
+      The glow behind the parting is a stand-in for a chamber you cannot
+      see into while the door is shut. Once it is open you can see the
+      real one, so the stand-in has to get out of the way or you walk
+      into a lit plane instead of a room.
+    */
+    if (seam.current) seam.current.emissiveIntensity = (lit ? 3.4 : 2) * (1 - e);
+  });
   const yaw = sgn > 0 ? -Math.PI / 2 : Math.PI / 2;
 
   const W = DOOR_W;
@@ -1210,20 +1258,6 @@ function Door({
     return { left: build(-hw, -GAP), right: build(GAP, hw) };
   }, [W, GAP, archY]);
 
-  /** Rivets following the jamb and the curve of each leaf. */
-  const rivets = useMemo(() => {
-    const out: { x: number; y: number }[] = [];
-    const hw = W / 2 - 0.3;
-    for (const side of [-1, 1] as const) {
-      for (let y = 0.4; y < SPRING - 0.2; y += 0.58) out.push({ x: side * hw, y });
-      for (let i = 0; i <= 8; i += 1) {
-        const x = side * (hw - (hw - GAP - 0.25) * (i / 8));
-        out.push({ x, y: archY(x) - 0.33 });
-      }
-    }
-    return out;
-  }, [W, SPRING, GAP, archY]);
-
   /*
     Three rings, ancient on the outside and technological on the inside.
     Only the innermost is etched; the middle carries faint vein light in
@@ -1247,31 +1281,61 @@ function Door({
 
   return (
     <group position={[doorX(door.side), 0, door.z]} rotation={[0, yaw, 0]}>
-      {/* the reveal: wall thickness seen from inside the opening */}
+      {/*
+        The reveal: wall thickness seen from inside the opening.
+
+        Open at both ends, which a box is not. Drawn inside-out, the far
+        face of a closed box caps the passage with a dark plane — fine
+        while the door never opened, but the moment it does you are
+        looking at that cap instead of into the chamber behind it. The
+        two end faces are therefore dropped and only the four sides of
+        the tunnel are drawn.
+      */}
       <mesh position={[0, H / 2, -RECESS / 2]}>
         <boxGeometry args={[W, H, RECESS]} />
-        <meshStandardMaterial
-          color="#0c1015"
-          roughness={0.95}
-          metalness={0.2}
-          side={THREE.BackSide}
-        />
+        {[0, 1, 2, 3, 4, 5].map((i) => {
+          const end = i >= 4; // +z and -z, the two ends
+          return (
+            <meshStandardMaterial
+              key={i}
+              attach={`material-${i}`}
+              color="#0c1015"
+              roughness={0.95}
+              metalness={0.2}
+              side={THREE.BackSide}
+              transparent={end}
+              opacity={end ? 0 : 1}
+              depthWrite={!end}
+            />
+          );
+        })}
       </mesh>
 
       {/* the lit chamber behind, which the parting lets through */}
       <mesh position={[0, H * 0.45, LEAF_Z - 0.55]}>
         <planeGeometry args={[W * 0.9, H]} />
         <meshStandardMaterial
+          ref={seam}
           color={GOLD.core}
           emissive={GOLD.core}
           emissiveIntensity={lit ? 3.4 : 2}
+          transparent
         />
       </mesh>
 
       {/* ---- the two arched leaves ---- */}
       {([-1, 1] as const).map((side) => (
-        <group key={side} position={[0, 0, LEAF_Z]}>
-          <mesh castShadow receiveShadow>
+        <group
+          key={side}
+          ref={(g) => {
+            pivots.current[side < 0 ? 0 : 1] = g;
+          }}
+          position={[side * (W / 2 - 0.08), 0, LEAF_Z]}
+        >
+          {/* offset back to the door's centreline, so the leaf is drawn
+              where it always was while turning about its own jamb */}
+          <group position={[-side * (W / 2 - 0.08), 0, 0]}>
+          <mesh>
             <extrudeGeometry
               args={[
                 side < 0 ? leaves.left : leaves.right,
@@ -1306,49 +1370,51 @@ function Door({
             angles only, and an exact mirror of the other side — the
             symmetry is what makes it read as deliberate.
           */}
-          {INLAY.map((seg, i) => {
-            const x1 = side * seg.x1 * W;
-            const x2 = side * seg.x2 * W;
-            const y1 = seg.y1 * H;
-            const y2 = seg.y2 * H;
-            const len = Math.hypot(x2 - x1, y2 - y1);
-            const horizontal = Math.abs(x2 - x1) > Math.abs(y2 - y1);
-            return (
-              <mesh
-                key={i}
-                position={[(x1 + x2) / 2, (y1 + y2) / 2, 0.252]}
-              >
-                <boxGeometry
-                  args={horizontal ? [len, 0.032, 0.014] : [0.032, len, 0.014]}
+          <Instances limit={INLAY.length}>
+            <boxGeometry args={[1, 1, 1]} />
+            <meshStandardMaterial
+              color={GOLD.core}
+              emissive={GOLD.core}
+              emissiveIntensity={trace * 1.1}
+              roughness={0.42}
+              metalness={0.5}
+            />
+            {INLAY.map((seg, i) => {
+              const x1 = side * seg.x1 * W;
+              const x2 = side * seg.x2 * W;
+              const y1 = seg.y1 * H;
+              const y2 = seg.y2 * H;
+              const len = Math.hypot(x2 - x1, y2 - y1);
+              const horizontal = Math.abs(x2 - x1) > Math.abs(y2 - y1);
+              return (
+                <Instance
+                  key={i}
+                  position={[(x1 + x2) / 2, (y1 + y2) / 2, 0.252]}
+                  scale={horizontal ? [len, 0.032, 0.014] : [0.032, len, 0.014]}
                 />
-                <meshStandardMaterial
-                  color={GOLD.core}
-                  emissive={GOLD.core}
-                  emissiveIntensity={trace * 1.1}
-                  roughness={0.42}
-                  metalness={0.5}
-                />
-              </mesh>
-            );
-          })}
-          {INLAY_NODES.map((n, i) => (
-            <mesh
-              key={`n${i}`}
-              position={[side * n.x * W, n.y * H, 0.254]}
-            >
-              <boxGeometry args={[0.075 * n.s, 0.075 * n.s, 0.016]} />
-              <meshStandardMaterial
-                color={GOLD.core}
-                emissive={GOLD.core}
-                emissiveIntensity={trace * 1.5}
-                roughness={0.4}
-                metalness={0.5}
+              );
+            })}
+          </Instances>
+          <Instances limit={INLAY_NODES.length}>
+            <boxGeometry args={[1, 1, 1]} />
+            <meshStandardMaterial
+              color={GOLD.core}
+              emissive={GOLD.core}
+              emissiveIntensity={trace * 1.5}
+              roughness={0.4}
+              metalness={0.5}
+            />
+            {INLAY_NODES.map((n, i) => (
+              <Instance
+                key={`n${i}`}
+                position={[side * n.x * W, n.y * H, 0.254]}
+                scale={[0.075 * n.s, 0.075 * n.s, 0.016]}
               />
-            </mesh>
-          ))}
+            ))}
+          </Instances>
 
           {/* raised panel band, with an etched field recessed inside it */}
-          <mesh position={[side * (W * 0.23), H * 0.2, 0.26]} castShadow>
+          <mesh position={[side * (W * 0.23), H * 0.2, 0.26]}>
             <boxGeometry args={[W * 0.34, H * 0.3, 0.05]} />
             <meshStandardMaterial
               color={IRON}
@@ -1370,52 +1436,70 @@ function Door({
             />
           </mesh>
 
-          {/* strap hinges reaching in from the jamb */}
-          {[H * 0.14, H * 0.38, H * 0.62].map((y) => (
-            <group key={y}>
-              <mesh position={[side * (W * 0.29), y, 0.265]} castShadow>
-                <boxGeometry args={[W * 0.38, 0.13, 0.055]} />
-                <meshStandardMaterial
-                  color={IRON_LIT}
-                  roughness={0.36}
-                  metalness={0.94}
-                  envMapIntensity={1.45}
-                />
-              </mesh>
-              {/* the tapered tip, so a strap is not just a bar */}
-              <mesh position={[side * (W * 0.1), y, 0.265]} rotation={[0, 0, Math.PI / 2]} castShadow>
-                <coneGeometry args={[0.085, 0.24, 4]} />
-                <meshStandardMaterial color={IRON_LIT} roughness={0.36} metalness={0.94} />
-              </mesh>
-              <mesh
-                position={[side * (W * 0.46), y, 0.265]}
+          {/*
+            Strap hinges reaching in from the jamb.
+
+            Three per leaf, and each was three meshes — eighteen draw
+            calls a door, two hundred across the hall, for the same bar,
+            tip and pin repeated. Instanced they are three, and the
+            geometry is uploaded once instead of eighteen times.
+          */}
+          <Instances limit={3}>
+            <boxGeometry args={[W * 0.38, 0.13, 0.055]} />
+            <meshStandardMaterial
+              color={IRON_LIT}
+              roughness={0.36}
+              metalness={0.94}
+              envMapIntensity={1.45}
+            />
+            {HINGE_Y.map((f) => (
+              <Instance key={f} position={[side * (W * 0.29), H * f, 0.265]} />
+            ))}
+          </Instances>
+
+          {/* the tapered tip, so a strap is not just a bar */}
+          <Instances limit={3}>
+            <coneGeometry args={[0.085, 0.24, 4]} />
+            <meshStandardMaterial color={IRON_LIT} roughness={0.36} metalness={0.94} />
+            {HINGE_Y.map((f) => (
+              <Instance
+                key={f}
+                position={[side * (W * 0.1), H * f, 0.265]}
                 rotation={[0, 0, Math.PI / 2]}
-                castShadow
-              >
-                <cylinderGeometry args={[0.08, 0.08, 0.22, 12]} />
-                <meshStandardMaterial color={IRON_LIT} roughness={0.34} metalness={0.95} />
-              </mesh>
-            </group>
-          ))}
+              />
+            ))}
+          </Instances>
+
+          <Instances limit={3}>
+            <cylinderGeometry args={[0.08, 0.08, 0.22, 12]} />
+            <meshStandardMaterial color={IRON_LIT} roughness={0.34} metalness={0.95} />
+            {HINGE_Y.map((f) => (
+              <Instance
+                key={f}
+                position={[side * (W * 0.46), H * f, 0.265]}
+                rotation={[0, 0, Math.PI / 2]}
+              />
+            ))}
+          </Instances>
+          </group>
         </group>
       ))}
 
-      {/* rivets over the ironwork */}
-      {rivets.map((rv, i) => (
-        <mesh key={i} position={[rv.x, rv.y, LEAF_Z + 0.27]} castShadow>
-          <sphereGeometry args={[0.052, 10, 8]} />
-          <meshStandardMaterial
-            color={IRON_LIT}
-            roughness={0.3}
-            metalness={0.96}
-            envMapIntensity={1.45}
-          />
-        </mesh>
-      ))}
+      {/*
+        The rivets are gone.
+
+        Thirty-two spheres a door, so a hundred and ninety-two draw
+        calls across the hall, for beads a couple of centimetres across
+        that are never read as individual objects at any distance you
+        actually stand. They were also pinned to the door frame rather
+        than to the leaves, so once the leaves began to swing the rivets
+        stayed behind, hanging in the opening. The strap hinges and the
+        engraving carry the ironwork on their own.
+      */}
 
       {/* ---- the hexagonal sigil, split across the parting ---- */}
       <group position={[0, H * 0.42, LEAF_Z + 0.28]}>
-        <mesh castShadow rotation={[Math.PI / 2, 0, 0]}>
+        <mesh rotation={[Math.PI / 2, 0, 0]}>
           <cylinderGeometry args={[0.52, 0.56, 0.09, 6]} />
           <meshStandardMaterial
             color={IRON}
@@ -1475,7 +1559,7 @@ function Door({
 
       {/* ---- the archivolts: ancient outside, technological inside ---- */}
       {RINGS.map((ring, i) => (
-        <mesh key={i} position={[0, 0, ring.z]} castShadow receiveShadow>
+        <mesh key={i} position={[0, 0, ring.z]}>
           <extrudeGeometry
             args={[
               archRing(
@@ -1580,7 +1664,7 @@ function Door({
         { w: W + 1.5, d: 0.5, y: 0.06, z: 0.35 },
         { w: W + 2.2, d: 0.5, y: 0.02, z: 0.8 },
       ].map((st, i) => (
-        <mesh key={i} position={[0, st.y, st.z]} castShadow receiveShadow>
+        <mesh key={i} position={[0, st.y, st.z]}>
           <boxGeometry args={[st.w, 0.12, st.d]} />
           <meshStandardMaterial
             color="#404f61"
@@ -1702,7 +1786,7 @@ function LayeredWall({
       {low.map((run) => (
         <group key={`run${run.x}`}>
           {/* the cladding field above the plinth */}
-          <mesh position={[run.x, (height + PLINTH_H) / 2, 0]} receiveShadow>
+          <mesh position={[run.x, (height + PLINTH_H) / 2, 0]}>
             <planeGeometry args={[run.len, height - PLINTH_H]} />
             <CladdingMaterial
               rx={run.len / CLAD_TILE}
@@ -1711,7 +1795,7 @@ function LayeredWall({
           </mesh>
 
           {/* darker plinth course, set slightly proud */}
-          <mesh position={[run.x, PLINTH_H / 2, 0.09]} receiveShadow>
+          <mesh position={[run.x, PLINTH_H / 2, 0.09]}>
             <planeGeometry args={[run.len, PLINTH_H]} />
             <meshStandardMaterial
               color={SHELL.recess}
@@ -1757,7 +1841,7 @@ function LayeredWall({
 
       {/* the lintel panel over a doorway, so the wall closes above it */}
       {opening ? (
-        <mesh position={[0, (height + opening.height) / 2, 0]} receiveShadow>
+        <mesh position={[0, (height + opening.height) / 2, 0]}>
           <planeGeometry args={[opening.width, height - opening.height]} />
           <CladdingMaterial
             rx={opening.width / CLAD_TILE}
@@ -1783,7 +1867,7 @@ function LayeredWall({
       </mesh>
 
       {/* the cove at the ceiling: lip, housing, diffuser behind it */}
-      <mesh position={[0, height - 0.5, 0.22]} castShadow>
+      <mesh position={[0, height - 0.5, 0.22]}>
         <boxGeometry args={[length, 0.1, 0.44]} />
         <meshStandardMaterial
           color={GOLD.metal}
@@ -1840,14 +1924,13 @@ function RoomPortal({
         <mesh
           key={s}
           position={[s * (width / 2 + JAMB / 2), height / 2, depth / 2]}
-          receiveShadow
         >
           <boxGeometry args={[JAMB, height + JAMB, depth]} />
           {reveal}
         </mesh>
       ))}
       {/* and the head over them */}
-      <mesh position={[0, height + JAMB / 2, depth / 2]} receiveShadow>
+      <mesh position={[0, height + JAMB / 2, depth / 2]}>
         <boxGeometry args={[width + JAMB * 2, JAMB, depth]} />
         {reveal}
       </mesh>
@@ -1889,9 +1972,106 @@ function RoomPortal({
  * grazed rather than flooded so whatever stands against it keeps the
  * contrast the palette asks for.
  */
-function RoomShell({ door }: { door: DoorSpec }) {
+/**
+ * Holds a subtree that never moves, and stops it being recalculated.
+ *
+ * `matrixAutoUpdate` is on by default, so every object rebuilds its
+ * local matrix and has its world matrix propagated on every single
+ * frame. For the hall that is a thousand-odd meshes of walls, floor,
+ * ceiling and lettering doing that work sixty times a second to arrive
+ * at the answer they had last frame.
+ *
+ * The matrices are computed once here, then frozen. Only put things in
+ * here that genuinely never move — the doors and the turntables must
+ * stay outside it.
+ */
+function Static({ children }: { children: ReactNode }) {
+  const group = useRef<THREE.Group>(null);
+  const frozen = useRef(false);
+
+  useFrame(() => {
+    if (frozen.current) return;
+    const g = group.current;
+    if (!g) return;
+    frozen.current = true;
+    g.updateMatrixWorld(true);
+    g.traverse((o) => {
+      o.matrixAutoUpdate = false;
+    });
+  });
+
+  return <group ref={group}>{children}</group>;
+}
+
+/**
+ * Brings the hall into being a piece at a time.
+ *
+ * Measured, the corridor mounted in one React commit that created 770
+ * geometries and 70 procedural textures — a single frame of nearly
+ * seven seconds, which is the loading screen appearing to hang. Every
+ * one of those textures is filled by per-pixel JavaScript, and they all
+ * ran back to back with no chance for the browser to paint between
+ * them.
+ *
+ * Nothing here is made cheaper; it is spread. Each door and each
+ * chamber arrives on its own tick, so no single frame carries more than
+ * one of them and the loading bar keeps moving. It is all still behind
+ * the veil, so the staging is never seen.
+ */
+function useStaged(total: number, everyMs: number) {
+  const [built, setBuilt] = useState(1);
+
+  useEffect(() => {
+    if (built >= total) return;
+    const t = window.setTimeout(() => setBuilt((n) => n + 1), everyMs);
+    return () => window.clearTimeout(t);
+  }, [built, total, everyMs]);
+
+  return built;
+}
+
+/** Where the strap hinges sit, as fractions of the door's height. */
+const HINGE_Y = [0.14, 0.38, 0.62];
+
+/** How far the leaves swing: wide enough to walk through and still be seen. */
+const DOOR_SWING = 1.28;
+
+/** Past this, a chamber is too far down the hall to be worth drawing. */
+const ROOM_VISIBLE_RANGE = 40;
+
+function RoomShellInner({ door, entered }: { door: DoorSpec; entered: boolean }) {
   const dir = door.side === "left" ? -1 : 1;
   const [cx, cz] = roomCenter(door);
+
+  /*
+    Built always, drawn only when you are near it.
+
+    The chambers flank the hall, so they sit inside the view cone for
+    most of the walk and the frustum will not cull them — six rooms'
+    worth of walls, floors and ceilings were being drawn behind solid
+    stone the whole way down the corridor, which is occlusion the GPU
+    cannot work out for itself.
+
+    Toggling `visible` skips the subtree entirely, so a far room costs
+    no draw calls at all, while its geometry, materials and compiled
+    shaders stay resident — which is the whole point of building them up
+    front. Done on the object rather than in React state so walking past
+    a door does not re-render anything.
+  */
+  const shell = useRef<THREE.Group>(null);
+  const here = useMemo(() => new THREE.Vector3(cx, CAM_Y, cz), [cx, cz]);
+  useFrame(({ camera }) => {
+    const g = shell.current;
+    if (!g) return;
+    /*
+      The room you have just walked into is drawn however far the camera
+      still is from it: the door is open, you are looking straight down
+      the route into it, and it has to be standing there the whole way
+      rather than appearing when you get close.
+    */
+    const show = entered || camera.position.distanceToSquared(here) < ROOM_VISIBLE_RANGE ** 2;
+    if (g.visible !== show) g.visible = show;
+  });
   const backX = cx + dir * (ROOM_DEPTH / 2);
   /*
     Nudged a hair into the room. The corridor's own wall plane sits at
@@ -1910,10 +2090,19 @@ function RoomShell({ door }: { door: DoorSpec }) {
     the thing you end up looking at. Two per side is what the 20-unit
     run takes at the corridor's own spacing.
   */
-  const lampX = [-1, 1].map((s) => cx + s * (ROOM_DEPTH / 4));
+  /*
+    Two fittings, not four.
+
+    Entering a room used to add six spotlights and a point light per
+    exhibit — up to thirteen. Every one of those forces a full shader
+    recompile, which is the stall you feel on the click. Three lights,
+    the same number for every room, keeps the recompile small and
+    predictable.
+  */
+  const lampX = [cx - dir * (ROOM_DEPTH / 4)];
 
   return (
-    <group>
+    <group ref={shell}>
       {/* back wall: the one the exhibits stand against */}
       <LayeredWall
         position={[backX, 0, cz]}
@@ -1955,64 +2144,177 @@ function RoomShell({ door }: { door: DoorSpec }) {
             key={`${s}-${x}`}
             position={[x, ROOM_H - LAMP_DROP, cz + s * (halfW - LAMP_REACH)]}
             yaw={s > 0 ? Math.PI / 2 : -Math.PI / 2}
+            lightless
           />
         )),
       )}
 
       {/*
-        Two washes down the back wall rather than one spot in the middle
-        of the ceiling. A single overhead light puts the room's brightest
-        patch on the floor you are standing on; grazing the wall the
-        exhibits are against is what holds the 8:1 the palette is built
-        around.
+        The lights that go with these fittings live in <RoomLights>,
+        which is mounted permanently. See the note there: mounting a
+        light here instead is what made entering a room stall.
       */}
-      {[-1, 1].map((s) => (
-        <PoolLight
-          key={`wash${s}`}
-          position={[backX - dir * 2.6, ROOM_H - 1.4, cz + s * (ROOM_WIDTH / 5)]}
-          target={[backX, 1.4, cz + s * (ROOM_WIDTH / 5)]}
-          intensity={LEVEL.vista * 0.7}
-          angle={0.62}
-          distance={26}
-        />
-      ))}
-
-      {/* enough ambient in the volume itself that the floor is not a void */}
-      <PoolLight
-        position={[cx, ROOM_H - 0.8, cz]}
-        target={[cx, 0, cz]}
-        intensity={LEVEL.vista * 0.45}
-        angle={0.9}
-        distance={30}
-      />
     </group>
   );
 }
 
+/**
+ * The room lights, mounted permanently.
+ *
+ * This is the fix for the stall on clicking a door. Three bakes the
+ * scene's light count into every material's shader, so adding even one
+ * light forces EVERY material to recompile — which is what froze the
+ * view mid-transition. These three exist from the first frame and are
+ * merely moved and faded when a room is entered, so the count never
+ * changes and nothing is ever recompiled.
+ *
+ * Parked below the floor at zero intensity when no room is open, where
+ * they light nothing.
+ */
+function RoomLights({ door }: { door: DoorSpec | undefined }) {
+  const keyRef = useRef<THREE.SpotLight>(null);
+  const fillRef = useRef<THREE.SpotLight>(null);
+  const washRef = useRef<THREE.SpotLight>(null);
+  const targetRef = useRef<THREE.Object3D>(null);
+
+  useEffect(() => {
+    const t = targetRef.current;
+    if (!t) return;
+    for (const r of [keyRef, fillRef, washRef]) {
+      if (r.current) r.current.target = t;
+    }
+    t.updateMatrixWorld();
+  }, []);
+
+  const on = Boolean(door);
+  const [cx, cz] = door ? roomCenter(door) : [0, 0];
+  const dir = door?.side === "left" ? -1 : 1;
+  const y = on ? ROOM_H - LAMP_DROP : -40;
+
+  return (
+    <>
+      <spotLight
+        ref={keyRef}
+        position={[cx - dir * (ROOM_DEPTH / 4), y, cz - (ROOM_WIDTH / 2 - LAMP_REACH)]}
+        angle={1.15}
+        penumbra={0.95}
+        intensity={on ? 190 : 0}
+        color={GOLD.light}
+        distance={18}
+        decay={2}
+      />
+      <spotLight
+        ref={fillRef}
+        position={[cx - dir * (ROOM_DEPTH / 4), y, cz + (ROOM_WIDTH / 2 - LAMP_REACH)]}
+        angle={1.15}
+        penumbra={0.95}
+        intensity={on ? 190 : 0}
+        color={GOLD.light}
+        distance={18}
+        decay={2}
+      />
+      {/* grazes the back wall the exhibits stand against */}
+      <spotLight
+        ref={washRef}
+        position={[cx + dir * (ROOM_DEPTH / 2 - 1.4), on ? ROOM_H - 1 : -40, cz]}
+        angle={0.9}
+        penumbra={0.9}
+        intensity={on ? 240 : 0}
+        color={GOLD.light}
+        distance={16}
+        decay={2}
+      />
+      <object3D ref={targetRef} position={[cx, on ? 1.4 : -44, cz]} />
+    </>
+  );
+}
+
+/*
+  The hall is memoised, every piece of it.
+
+  Entering a room changes one value at the top of this tree, and without
+  this React reconciles the whole corridor to discover that none of it
+  moved — every wall span, every lintel, every slab — before the camera
+  is allowed to start. None of these take props, so skipping them is
+  always safe, and it takes the click's React work down to the doors and
+  the rooms, which are the only things that actually differ.
+*/
+/*
+  And the same for the pieces that do take props: five of the six doors
+  and five of the six rooms are identical either side of a click, so
+  only the one you opened is rebuilt.
+*/
+const Door = memo(DoorInner);
+const RoomShell = memo(RoomShellInner);
+const Cases = memo(CasesInner);
+
+const Walls = memo(WallsInner);
+const Floor = memo(FloorInner);
+const Ceiling = memo(CeilingInner);
+const FarFocus = memo(FarFocusInner);
+
 export function Corridor({
+  built,
   activeRoom,
   onEnter,
   activeId,
   onSelect,
 }: {
+  built: RoomId[];
   activeRoom: RoomId | null;
   onEnter: (id: RoomId) => void;
   activeId: string | null;
   onSelect: (exhibit: ExhibitDatum) => void;
 }) {
   const entered = doors.find((d) => d.id === activeRoom);
+  // the doors themselves are part of the hall, so they all arrive — one per tick
+  const step = useStaged(doors.length, 90);
   return (
     <>
-      <Walls />
-      <Atrium />
-      <Floor />
-      <Ceiling />
-      <FarFocus />
-      <WallInscriptions />
-      <WallArt />
+      <Static>
+        <Walls />
+        <Atrium />
+        <Floor />
+        <Ceiling />
+        <FarFocus />
+        <WallInscriptions />
+        <WallArt />
+      </Static>
       <Cases activeId={activeId} onSelect={onSelect} />
-      {entered ? <RoomShell door={entered} /> : null}
-      {doors.map((door) => (
+      <RoomLights door={entered} />
+      {/*
+        Every chamber is built, always.
+
+        Mounting a room on the click that enters it meant the click had
+        to pay for four walls, a floor, a ceiling and their materials
+        before anything could move — and with the camera now walking in
+        through the doorway rather than cutting through the wall, the
+        room has to be standing there before it arrives, or you watch it
+        pop into existence through the opening.
+
+        They are built once while the loading veil is still up, and the
+        frustum culls the ones behind you. What this buys is that the
+        hall and the six chambers are a single continuous building from
+        the first frame: the camera only ever moves through it.
+      */}
+      {/*
+        Only the chambers you are near.
+
+        These used to be built all at once at load, to make the hall and
+        the rooms one continuous building. They still are continuous —
+        but a room is raised when the camera comes within range of its
+        door, not when the page opens. Walking the corridor takes
+        seconds, so by the time a door is close enough to click, the
+        room behind it has long since been built and its shaders
+        compiled. The click stays free and the load stops carrying six
+        rooms it cannot yet show.
+      */}
+      {doors
+        .filter((door) => built.includes(door.id))
+        .map((door) => (
+          <RoomShell key={door.id} door={door} entered={activeRoom === door.id} />
+        ))}
+      {doors.slice(0, step).map((door) => (
         <Door key={door.id} door={door} active={activeRoom === door.id} onEnter={onEnter} />
       ))}
     </>

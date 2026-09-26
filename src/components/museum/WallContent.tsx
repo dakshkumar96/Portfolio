@@ -109,10 +109,19 @@ export function WallLamp({
   position,
   yaw = 0,
   intensity = 150,
+  lightless = false,
 }: {
   position: [number, number, number];
   yaw?: number;
   intensity?: number;
+  /**
+   * Render the fitting without its light.
+   *
+   * Rooms use this: their lights are mounted permanently elsewhere so
+   * the scene's light count never changes, while the visible fitting
+   * still appears and disappears with the room.
+   */
+  lightless?: boolean;
 }) {
   const armLen = 1.05;
 
@@ -176,7 +185,7 @@ export function WallLamp({
         />
       </mesh>
 
-      <SpotDown y={-0.26} intensity={intensity} />
+      {lightless ? null : <SpotDown y={-0.26} intensity={intensity} />}
     </group>
   );
 }
@@ -371,7 +380,7 @@ function FramedPiece({
       {Array.from({ length: spec.steps }, (_, k) => {
         const grow = spec.border * (1 + k * 0.85);
         return (
-          <mesh key={k} position={[0, 0, -0.03 - k * 0.03]} castShadow>
+          <mesh key={k} position={[0, 0, -0.03 - k * 0.03]}>
             <boxGeometry args={[W + grow * 2, H + grow * 2, spec.depth - k * 0.04]} />
             <meshStandardMaterial
               color={k === 0 ? GOLD.metal : MID.bronze}
