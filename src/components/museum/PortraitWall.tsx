@@ -96,7 +96,7 @@ function Frame({
   return (
     <group position={position} rotation={rotation}>
       {/* brushed dark bezel */}
-      <mesh position={[0, 0, -0.04]} castShadow>
+      <mesh position={[0, 0, -0.04]}>
         <boxGeometry args={[W + 0.14, H + 0.14, 0.08]} />
         <meshStandardMaterial
           color={GOLD.metal}
@@ -282,7 +282,7 @@ export function PortraitWall({
         Set back far enough from the wall to be a real viewing distance
         now that the room has the depth for one.
       */}
-      <mesh position={[cx - sgn * 2.4, 0.26, cz]} castShadow receiveShadow>
+      <mesh position={[cx - sgn * 2.4, 0.26, cz]}>
         <boxGeometry args={[0.9, 0.52, 4.4]} />
         <meshStandardMaterial color={MID.plinth} roughness={0.5} metalness={0.3} envMapIntensity={0.9} />
       </mesh>

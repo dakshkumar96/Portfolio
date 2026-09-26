@@ -38,13 +38,40 @@ export function MuseumWorld() {
   const [active, setActive] = useState<ExhibitDatum | null>(null);
   const [webgl, setWebgl] = useState<boolean | null>(null);
   const [loaded, setLoaded] = useState(false);
+  /*
+    Set by the canvas once the hall is built, compiled and drawn. The
+    files being downloaded is not the same thing: the rooms are built
+    over a few seconds and their shaders compiled a slice at a time, so
+    lifting the veil on the loading manager alone showed a half-built
+    hall — a blank screen with nothing in it yet.
+  */
+  const [painted, setPainted] = useState(false);
 
+  /*
+    Mount the canvas after the first paint — but never later than that.
+
+    This used to wait on requestAnimationFrame alone, which does not fire
+    at all while the tab is in the background. Load the page with the
+    window behind another one, or switch away while it loads, and the
+    probe never ran: the veil finished, and you came back to an empty
+    stage with no canvas in it, permanently. The timer is the guarantee;
+    the frame is still there because when the page IS visible it lands
+    first and keeps the heavy mount off the very first paint.
+  */
   useEffect(() => {
-    const id = requestAnimationFrame(() => {
+    let done = false;
+    const start = () => {
+      if (done) return;
+      done = true;
       setReady(true);
       setWebgl(hasWebGL());
-    });
-    return () => cancelAnimationFrame(id);
+    };
+    const frame = requestAnimationFrame(start);
+    const timer = window.setTimeout(start, 120);
+    return () => {
+      cancelAnimationFrame(frame);
+      window.clearTimeout(timer);
+    };
   }, []);
 
   /*
@@ -113,6 +140,19 @@ export function MuseumWorld() {
     return () => window.removeEventListener("keydown", onKey);
   }, [active, room]);
 
+  const handleReady = useCallback(() => setPainted(true), []);
+
+  /*
+    A cap on the whole thing. Whatever goes wrong — a driver that never
+    reports a compile finished, a machine slow enough that the queue
+    never drains — nobody is left behind a loading screen forever.
+  */
+  useEffect(() => {
+    if (painted || webgl === false) return;
+    const bail = window.setTimeout(() => setPainted(true), 12000);
+    return () => window.clearTimeout(bail);
+  }, [painted, webgl]);
+
   const enterRoom = useCallback((id: RoomId) => {
     setActive(null);
     setRoom(id);
@@ -131,11 +171,12 @@ export function MuseumWorld() {
 
   return (
     <div ref={rootRef} className={`museum-root${ready ? " ready" : ""}`}>
-      <LoadingVeil ready={loaded} />
+      <LoadingVeil ready={loaded && (painted || webgl === false)} />
 
       <div className="museum-canvas-fixed">
         {webgl ? (
           <MuseumCanvas
+            onReady={handleReady}
             progressRef={progressRef}
             roomId={room}
             onEnterRoom={enterRoom}

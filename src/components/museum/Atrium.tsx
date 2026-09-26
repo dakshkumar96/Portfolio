@@ -22,7 +22,7 @@ export function Atrium() {
   return (
     <group>
       {/* the raised ceiling over the chamber */}
-      <mesh position={[0, top, ATRIUM_Z]} rotation={[Math.PI / 2, 0, 0]} receiveShadow>
+      <mesh position={[0, top, ATRIUM_Z]} rotation={[Math.PI / 2, 0, 0]}>
         <planeGeometry args={[HW * 2, HALF * 2]} />
         <meshStandardMaterial color={SHELL.recess} roughness={0.9} metalness={0.1} />
       </mesh>
@@ -33,7 +33,6 @@ export function Atrium() {
           key={sgn}
           position={[sgn * HW, WALL_H + LIFT / 2, ATRIUM_Z]}
           rotation={[0, sgn > 0 ? -Math.PI / 2 : Math.PI / 2, 0]}
-          receiveShadow
         >
           <planeGeometry args={[HALF * 2, LIFT]} />
           <meshStandardMaterial color={SHELL.wall} roughness={0.6} metalness={0.2} />
@@ -45,7 +44,6 @@ export function Atrium() {
           key={`e${sgn}`}
           position={[0, WALL_H + LIFT / 2, ATRIUM_Z + sgn * HALF]}
           rotation={[0, sgn > 0 ? Math.PI : 0, 0]}
-          receiveShadow
         >
           <planeGeometry args={[HW * 2, LIFT]} />
           <meshStandardMaterial color={SHELL.wall} roughness={0.6} metalness={0.2} />
@@ -78,7 +76,7 @@ export function Atrium() {
       {[-1, 1].map((sgn) => (
         <group key={`cove${sgn}`}>
           {/* the cove lip the strip hides behind */}
-          <mesh position={[sgn * (HW - 0.22), top - 0.5, ATRIUM_Z]} castShadow>
+          <mesh position={[sgn * (HW - 0.22), top - 0.5, ATRIUM_Z]}>
             <boxGeometry args={[0.44, 0.1, HALF * 1.92]} />
             <meshStandardMaterial
               color={GOLD.metal}

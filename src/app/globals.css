@@ -45,6 +45,16 @@
 
 html {
   overflow-x: clip;
+  /*
+    Reserve the scrollbar's width whether or not one is showing.
+
+    Entering a room locks body scrolling, and without this the scrollbar
+    vanishing changes the page's width — a full reflow, plus a
+    ScrollTrigger recalculation, landing on the exact frame the camera
+    is supposed to start moving. Holding the gutter means locking scroll
+    changes no layout at all.
+  */
+  scrollbar-gutter: stable;
 }
 
 html,
