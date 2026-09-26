@@ -42,3 +42,6 @@ next-env.d.ts
 
 # raw 3D sources — the app only ever serves the exports in public/models
 /3d models for glass boxes/
+
+# uncompressed source models, kept locally so the optimised ones can be regenerated
+.model-originals/
