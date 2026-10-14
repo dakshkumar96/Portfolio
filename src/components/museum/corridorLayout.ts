@@ -10,7 +10,14 @@ export type { RoomId };
 export const HALF_WIDTH = 8;
 export const WALL_H = 13;
 export const Z_NEAR = 20;
-export const LENGTH = 130;
+/*
+  Six doors at 18 apart put the last one at z=-106. The hall ends eight
+  units past it: at four, the last door's stepped surround - two and a half
+  units either side of its centre - all but touched the end wall, and the
+  door and the wall read as one thing. Eight leaves the wall room to be a
+  wall, and the statue room to stand in front of it.
+*/
+export const LENGTH = 134;
 export const Z_FAR = Z_NEAR - LENGTH;
 
 /** Two long ceiling slots that drop angled shafts onto the floor. */
@@ -41,11 +48,11 @@ const DOOR_GAP = 18;
 export const doors: DoorSpec[] = (
   [
     ["about", "About Me"],
+    ["experience", "Experience"],
     ["projects", "Projects"],
     ["skills", "Skills"],
     ["art", "Art"],
     ["contact", "Contact"],
-    ["resume", "Resume"],
   ] as [RoomId, string][]
 ).map(([id, label], i) => ({
   id,
@@ -70,6 +77,14 @@ export const CASE_POSITIONS: [number, number][] = (() => {
   for (let i = 0; i < doors.length - 1; i += 1) {
     zs.push((doors[i].z + doors[i + 1].z) / 2);
   }
+  /*
+    And one past the last door, so the six cases survived losing a door.
+    Without it the run ended on a doorway and the last stretch of hall
+    had nothing in it at all.
+  */
+  zs.push(doors[doors.length - 1].z - DOOR_GAP / 2);
+  // six doors put the tail's case past the end of the hall; six cases is what there are to show
+  zs.length = Math.min(zs.length, 6);
   return zs.map((z, i) => [i % 2 === 0 ? -CASE_X : CASE_X, z] as [number, number]);
 })();
 
@@ -91,66 +106,25 @@ export const ROOM_DEPTH = 20;
 export const ROOM_WIDTH = 24;
 export const ROOM_H = WALL_H;
 
+/**
+ * How far into the hall's side each room runs, and how wide it is along it.
+ *
+ * Most rooms are the standard size above. The Experience room has more to
+ * show than any other, so it is larger: as wide as the doors' spacing
+ * allows. Rooms on one side of the hall are 36 apart, so 32 wide leaves
+ * a clear 8 between neighbouring walls; and nothing stands beyond a room's
+ * back wall, so it can be as deep as it likes.
+ */
+export function roomSize(door: DoorSpec) {
+  return door.id === "experience" ? { depth: 26, width: 32 } : { depth: ROOM_DEPTH, width: ROOM_WIDTH };
+}
+
 export function roomCenter(door: DoorSpec): [number, number] {
   const dir = door.side === "left" ? -1 : 1;
-  return [dir * (HALF_WIDTH + ROOM_DEPTH / 2), door.z];
+  return [dir * (HALF_WIDTH + roomSize(door).depth / 2), door.z];
 }
 
-/** Where the camera parks inside a room, and what it faces. */
-export function roomView(door: DoorSpec): {
-  position: [number, number, number];
-  look: [number, number, number];
-} {
-  const dir = door.side === "left" ? -1 : 1;
-  const [cx, cz] = roomCenter(door);
-  /*
-    Just inside the threshold, at the same eye height as the corridor.
-    Standing a few paces in rather than at the room's centre is what a
-    visitor actually does: it keeps the back wall and both side walls in
-    frame at once, so the room reads as a volume you have stepped into
-    rather than a flat wall you are facing.
-  */
-  return {
-    position: [cx - dir * (ROOM_DEPTH / 2 - 3.5), CAM_Y, cz],
-    look: [cx + dir * ROOM_DEPTH, CAM_Y - 0.2, cz],
-  };
-}
-
-/**
- * The way in and out of a room, as a route rather than a destination.
- *
- * This is the fix for the transition feeling disconnected. Flying the
- * camera straight at the room's viewing position sends it diagonally
- * through a solid wall: a long move that passes through stone, arrives
- * from nowhere, and never once shows you the door you clicked. These
- * three waypoints make it walk the way a visitor would — square up to
- * the door, pass through the opening, then step into the room — so the
- * hall and the chamber read as one connected building.
- *
- * Listed outward; the camera follows them in reverse to leave.
- */
-export function roomPath(door: DoorSpec): {
-  points: [number, number, number][];
-  looks: [number, number, number][];
-} {
-  const dir = door.side === "left" ? -1 : 1;
-  const [cx, cz] = roomCenter(door);
-  const view = roomView(door);
-  return {
-    points: [
-      // out in the hall, squared up in front of the doorway
-      [dir * (HALF_WIDTH - 5.5), CAM_Y, door.z],
-      // in the opening itself
-      [dir * (HALF_WIDTH + 0.8), CAM_Y, door.z],
-      view.position,
-    ],
-    looks: [
-      [dir * HALF_WIDTH, CAM_Y - 0.1, door.z],
-      [cx + dir * ROOM_DEPTH * 0.5, CAM_Y - 0.15, cz],
-      view.look,
-    ],
-  };
-}
+/* roomView and roomPath live in roomLayout.ts, next to the exhibits they frame. */
 
 export const CAM_Z_START = 17;
 export const CAM_Z_END = Z_FAR + 12;
@@ -165,6 +139,9 @@ export const CAM_Z_END = Z_FAR + 12;
  * would if you were walking past them.
  */
 export const CAM_Y = 2.8;
+
+/** The camera's vertical field of view, in degrees. */
+export const CAM_FOV = 50;
 
 export function doorX(side: "left" | "right") {
   return side === "left" ? -HALF_WIDTH : HALF_WIDTH;

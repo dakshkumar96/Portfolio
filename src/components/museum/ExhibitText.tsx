@@ -21,8 +21,18 @@ function useTextTexture(text: string) {
     const ctx = canvas.getContext("2d");
     if (!ctx) return null;
 
-    const font = `600 ${FONT_PX}px Inter, system-ui, sans-serif`;
+    /*
+      Heavy, and tracked out.
+
+      At 600 the lettering thinned to almost nothing once it was
+      emissive - a glow spreads, so a light weight eats itself and
+      leaves a smear. 800 holds its shape under bloom, and the letter
+      spacing stops the glow of one character closing the gap to the
+      next.
+    */
+    const font = `800 ${FONT_PX}px Inter, system-ui, sans-serif`;
     ctx.font = font;
+    ctx.letterSpacing = "0.06em";
     const metrics = ctx.measureText(text);
     const w = Math.ceil(metrics.width) + PAD * 2;
     const h = FONT_PX + PAD * 2;
@@ -32,6 +42,7 @@ function useTextTexture(text: string) {
 
     // resizing clears the context, so restate the font
     ctx.font = font;
+    ctx.letterSpacing = "0.06em";
     ctx.textBaseline = "middle";
     ctx.textAlign = "center";
     ctx.fillStyle = "#ffffff";
@@ -83,14 +94,37 @@ export function ExhibitText({
       {layers.map((z, i) => (
         <mesh key={z} position={[0, 0, z]}>
           <planeGeometry args={[width, height]} />
-          <meshBasicMaterial
-            map={data.texture}
-            transparent
-            depthWrite={i === 0}
-            opacity={i === 0 ? 1 : 0.35 - i * 0.08}
-            color={i === 0 ? (lit ? GOLD_HOT : GOLD) : "#6b4a1e"}
-            toneMapped={false}
-          />
+          {i === 0 ? (
+            /*
+              The face is emissive, not a flat fill.
+
+              A basic material caps at the colour you give it, so gold
+              text sat at exactly its own value and never crossed the
+              bloom threshold - it read as painted-on rather than lit.
+              Emitting above 1 with the base colour black means the only
+              thing on screen is the glow, which is what makes lettering
+              look like it is made of light.
+            */
+            <meshStandardMaterial
+              map={data.texture}
+              emissiveMap={data.texture}
+              emissive={lit ? GOLD_HOT : GOLD}
+              emissiveIntensity={lit ? 3.6 : 2.3}
+              color="#000000"
+              transparent
+              depthWrite
+              toneMapped={false}
+            />
+          ) : (
+            <meshBasicMaterial
+              map={data.texture}
+              transparent
+              depthWrite={false}
+              opacity={0.35 - i * 0.08}
+              color="#6b4a1e"
+              toneMapped={false}
+            />
+          )}
         </mesh>
       ))}
 
@@ -111,9 +145,21 @@ export function ExhibitText({
         <planeGeometry args={[width + 0.25, height + 0.25]} />
       </mesh>
 
-      {lit ? (
-        <pointLight position={[0, 0, 0.6]} color={GOLD_HOT} intensity={3} distance={3.5} />
-      ) : null}
+      {/*
+        There used to be a point light here, switched on whenever the
+        label was hovered or active. That was the stall on clicking a
+        door.
+
+        Three bakes the number of lights in the scene into every
+        material's shader. A light that appears on hover changes that
+        number, so every material in the museum recompiled the moment
+        the pointer touched a label - and again when it left. Clicking a
+        door made its label active, so the click itself triggered a full
+        recompile, and leaving the room triggered another.
+
+        The lettering already emits its own light above the bloom
+        threshold, so the glow you see when it is lit is unchanged.
+      */}
     </group>
   );
 }

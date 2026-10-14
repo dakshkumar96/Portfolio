@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useRef } from "react";
 import * as THREE from "three";
 import { GOLD, MID, SHELL } from "./palette";
 import { HALF_WIDTH as HW, WALL_H, Z_NEAR, Z_FAR } from "./corridorLayout";
@@ -47,9 +47,13 @@ export function inscriptionLines(): string[] {
  * to 56 lights on their own, which would have cost far more than the
  * evenness was worth. At 13 they still overlap into a continuous wash.
  */
-const CORNER_STATIONS: number[] = (() => {
+export const CORNER_STATIONS: number[] = (() => {
   const out: number[] = [];
-  for (let z = Z_NEAR - 6; z > Z_FAR + 2; z -= 13) out.push(z);
+  /*
+    At the centre of every other bay - 18 apart, over the doors - so a lamp
+    never lands on a pilaster, which stand at the bays' edges.
+  */
+  for (let z = 2; z > Z_FAR + 2; z -= 18) out.push(z);
   return out;
 })();
 
@@ -223,7 +227,8 @@ export function WallInscriptions() {
               for the whole length, which is what a strip is — the light
               it appears to give is the diffuser, not a row of lamps.
             */}
-            <mesh position={[sgn * (HW - 0.2), WALL_H - 0.38, midZ]}>
+            {/* under the cornice, so it lights the cornice's underside instead of vanishing inside it */}
+            <mesh position={[sgn * (HW - 0.2), WALL_H - 1.05, midZ]}>
               <boxGeometry args={[0.035, 0.07, runLen]} />
               <meshStandardMaterial
                 color="#fff4e0"
@@ -244,11 +249,26 @@ export function WallInscriptions() {
               so the pools overlap into a continuous run instead of
               reading as separate lamps.
             */}
-            {CORNER_STATIONS.map((z) => (
+            {/*
+              Every fitting is drawn; only every other one carries a
+              light.
+
+              Sixteen cove spotlights was a third of all the lights in
+              the hall, and in a forward renderer every one of them is
+              computed for every lit pixel, every frame, whether it
+              reaches that pixel or not. The pools were spaced to overlap
+              into a continuous run anyway, so lighting alternate
+              stations at a stronger setting gives the same wash with
+              half the cost - and the wall keeps its full rhythm of
+              lamps, because the fittings themselves are all still here.
+            */}
+            {CORNER_STATIONS.map((z, i) => (
               <WallLamp
                 key={`ceil${sgn}${z}`}
                 position={[sgn * (HW - LAMP_REACH), WALL_H - LAMP_DROP, z]}
                 yaw={sgn > 0 ? 0 : Math.PI}
+                lightless={i % 2 === 1}
+                intensity={240}
               />
             ))}
 
@@ -258,17 +278,16 @@ export function WallInscriptions() {
               <meshStandardMaterial color={SHELL.recess} roughness={0.9} />
             </mesh>
             {/*
-              Warm and very dim. This was GOLD.core — a near-white — at a
-              hairline width running the full length, which drew as a hard
-              graphic line along the floor rather than a light. A skirting
-              strip is a faint warm glow in a shadow gap, not an outline.
+              Warm gold and dim: a faint glow in a shadow gap, not a white
+              line drawn down the floor. At its old near-white it was the
+              brightest thing at the foot of every door.
             */}
             <mesh position={[sgn * (HW - 0.28), 0.1, midZ]}>
               <boxGeometry args={[0.03, 0.06, runLen]} />
               <meshStandardMaterial
-                color="#fff4e0"
-                emissive={GOLD.core}
-                emissiveIntensity={1.3}
+                color="#c8944a"
+                emissive="#c8944a"
+                emissiveIntensity={0.4}
                 roughness={0.6}
                 transparent
                 opacity={0.94}
@@ -284,196 +303,6 @@ export function WallInscriptions() {
         );
       })}
 
-    </>
-  );
-}
-
-/** A framed piece with its own picture light. */
-export type FrameStyle = "gallery" | "slim" | "stepped" | "mounted";
-
-/** Proportions and frame build, per style. */
-const FRAME_SPECS: Record<
-  FrameStyle,
-  { w: number; h: number; depth: number; border: number; steps: number; mount: number }
-> = {
-  // deep box frame, generous border, portrait-ish
-  gallery: { w: 1.9, h: 2.4, depth: 0.22, border: 0.2, steps: 1, mount: 0.12 },
-  // barely-there edge, wide landscape
-  slim: { w: 3.0, h: 1.5, depth: 0.06, border: 0.05, steps: 1, mount: 0 },
-  // stepped moulding, near-square
-  stepped: { w: 2.2, h: 2.0, depth: 0.2, border: 0.16, steps: 3, mount: 0.06 },
-  // slim frame with a wide visible mount inside it
-  mounted: { w: 2.5, h: 1.9, depth: 0.1, border: 0.07, steps: 1, mount: 0.26 },
-};
-
-function FramedPiece({
-  z,
-  side,
-  title,
-  subtitle,
-  seed,
-  style,
-}: {
-  z: number;
-  side: "left" | "right";
-  title: string;
-  subtitle: string;
-  seed: number;
-  style: FrameStyle;
-}) {
-  const sgn = side === "left" ? -1 : 1;
-  const spec = FRAME_SPECS[style];
-  const W = spec.w;
-  const H = spec.h;
-
-  const texture = useMemo(() => {
-    const w = 768;
-    const h = 512;
-    const canvas = document.createElement("canvas");
-    canvas.width = w;
-    canvas.height = h;
-    const ctx = canvas.getContext("2d", { willReadFrequently: true });
-    if (!ctx) return null;
-
-    // Stand-in artwork drawn at runtime. Point this at a real screenshot
-    // when you have one; the frame and picture light stay as they are.
-    const hue = 28 + seed * 14;
-    const g = ctx.createLinearGradient(0, 0, w, h);
-    g.addColorStop(0, `hsl(${hue}, 42%, 15%)`);
-    g.addColorStop(1, `hsl(${hue + 18}, 34%, 6%)`);
-    ctx.fillStyle = g;
-    ctx.fillRect(0, 0, w, h);
-
-    ctx.strokeStyle = `hsla(${hue + 10}, 70%, 60%, 0.45)`;
-    ctx.lineWidth = 2;
-    for (let i = 0; i < 14; i += 1) {
-      ctx.beginPath();
-      const y = (i / 14) * h;
-      ctx.moveTo(0, y);
-      ctx.bezierCurveTo(w * 0.3, y - 60, w * 0.7, y + 60, w, y);
-      ctx.stroke();
-    }
-
-    ctx.fillStyle = "rgba(0,0,0,0.58)";
-    ctx.fillRect(0, h - 122, w, 122);
-    ctx.fillStyle = "#ffe0ae";
-    ctx.font = "600 46px Inter, system-ui, sans-serif";
-    ctx.fillText(title, 34, h - 66);
-    ctx.fillStyle = "rgba(255,224,174,0.62)";
-    ctx.font = "400 26px Inter, system-ui, sans-serif";
-    ctx.fillText(subtitle, 34, h - 28);
-
-    const t = new THREE.CanvasTexture(canvas);
-    t.colorSpace = THREE.SRGBColorSpace;
-    t.anisotropy = 8;
-    return t;
-  }, [title, subtitle, seed]);
-
-  useEffect(() => () => texture?.dispose(), [texture]);
-
-  return (
-    <group
-      position={[sgn * (HW - 0.1), WALL_H * 0.42, z]}
-      rotation={[0, sgn > 0 ? -Math.PI / 2 : Math.PI / 2, 0]}
-    >
-      {/* the frame, stepped outward for the mouldings that have steps */}
-      {Array.from({ length: spec.steps }, (_, k) => {
-        const grow = spec.border * (1 + k * 0.85);
-        return (
-          <mesh key={k} position={[0, 0, -0.03 - k * 0.03]}>
-            <boxGeometry args={[W + grow * 2, H + grow * 2, spec.depth - k * 0.04]} />
-            <meshStandardMaterial
-              color={k === 0 ? GOLD.metal : MID.bronze}
-              roughness={0.24 + k * 0.08}
-              metalness={1}
-              envMapIntensity={1.5 - k * 0.2}
-            />
-          </mesh>
-        );
-      })}
-
-      {/* the mount board, where the style calls for one */}
-      {spec.mount > 0 ? (
-        <mesh position={[0, 0, 0.012]}>
-          <planeGeometry args={[W, H]} />
-          <meshStandardMaterial color="#1b1611" roughness={0.9} />
-        </mesh>
-      ) : null}
-
-      <mesh position={[0, 0, 0.03]}>
-        <planeGeometry args={[W - spec.mount * 2, H - spec.mount * 2]} />
-        <meshStandardMaterial
-          map={texture ?? undefined}
-          emissiveMap={texture ?? undefined}
-          emissive="#ffffff"
-          emissiveIntensity={0.72}
-          roughness={0.85}
-          metalness={0}
-        />
-      </mesh>
-
-      {/*
-        A plain bronze arm. It used to be emissive, which put a bright
-        lozenge on the wall above every frame — with the spotlight gone
-        that glow was all that remained of it, so it read as a light
-        floating on the wall rather than a fitting. The artwork carries
-        its own illumination now.
-      */}
-      <mesh position={[0, H / 2 + spec.border + 0.2, 0.34]}>
-        <boxGeometry args={[W * 0.42, 0.06, 0.12]} />
-        <meshStandardMaterial
-          color={MID.bronze}
-          roughness={0.4}
-          metalness={0.9}
-          envMapIntensity={1.2}
-        />
-      </mesh>
-      {/*
-        The picture light is a fitting, not a projector.
-
-        It used to carry a spotlight, which threw a hard circle onto the
-        wall behind every frame — six bright discs at mid-height, all
-        obviously artificial. The fitting still glows, and the artwork
-        carries its own emissive map, so the piece reads as lit without
-        painting a pool on the wall around it.
-      */}
-    </group>
-  );
-}
-
-/**
- * Four hung pieces, each framed differently.
- *
- * Identical frames in a row read as a product listing. Giving each one
- * its own profile — a deep gallery box, a slim modern edge, a stepped
- * classical moulding, a double-mount — is what makes a wall look
- * curated rather than tiled.
- */
-export function WallArt() {
-  const picks = projects.slice(0, 4);
-  const spots: { z: number; side: "left" | "right"; style: FrameStyle }[] = [
-    { z: -11, side: "right", style: "gallery" },
-    { z: -29, side: "left", style: "slim" },
-    { z: -65, side: "right", style: "stepped" },
-    { z: -83, side: "left", style: "mounted" },
-  ];
-
-  return (
-    <>
-      {spots.map((spot, i) => {
-        const project = picks[i % picks.length];
-        return (
-          <FramedPiece
-            key={`${project.slug}-${spot.z}`}
-            z={spot.z}
-            side={spot.side}
-            title={project.title}
-            subtitle={project.stack.slice(0, 2).join(" · ")}
-            seed={i}
-            style={spot.style}
-          />
-        );
-      })}
     </>
   );
 }

@@ -1,15 +1,18 @@
 import {
+  achievements,
+  certifications,
+  education,
   experience,
   projects,
-  education,
   skills,
   site,
   contact,
   about,
 } from "@/content/site";
 
-/** The five doors off the corridor. */
-export type RoomId = "about" | "projects" | "skills" | "art" | "contact" | "resume";
+/** The six doors off the corridor, and the resume, which has a card but no door. */
+export type RoomId = "about" | "experience" | "projects" | "skills" | "art" | "contact" | "resume";
+
 
 export type ExhibitDatum = {
   id: string;
@@ -18,6 +21,14 @@ export type ExhibitDatum = {
   meta?: string;
   body?: string;
   bullets?: string[];
+  /** Tools, shown as a grid of boxes with their marks rather than as a list. */
+  tools?: string[];
+  /**
+   * Buttons that close the card. A project always carries both of these;
+   * an `href` that is missing means that destination is not public, and
+   * the button is shown, dimmed, instead of vanishing.
+   */
+  actions?: { label: string; href?: string }[];
   links?: { label: string; href: string; external?: boolean }[];
 };
 
@@ -40,7 +51,6 @@ export const aboutExhibits: ExhibitDatum[] = [
     title: "About Me",
     meta: site.role,
     body: about.intro,
-    links: [{ label: "Read the full story", href: "/about" }],
   },
   {
     id: "about-story",
@@ -49,7 +59,6 @@ export const aboutExhibits: ExhibitDatum[] = [
     meta: "The short version",
     body: about.whoIAm[0],
     bullets: [about.whoIAm[2]],
-    links: [{ label: "Read the full story", href: "/about" }],
   },
   {
     id: "about-work",
@@ -58,27 +67,88 @@ export const aboutExhibits: ExhibitDatum[] = [
     meta: about.lookingFor,
     body: about.whoIAm[3],
     bullets: [about.whoIAm[1]],
-    links: [{ label: "See the projects", href: "/dev" }],
   },
+  /*
+    The two reading boards that stand between the photographs.
+
+    Written as interpretive panels - third person, plain, and built only
+    from what the About page already says. A panel tells you what you
+    are looking at; it does not try to move you.
+  */
+  {
+    id: "about-crossing",
+    room: "about",
+    title: "The Crossing",
+    meta: "Sindh to the United Kingdom",
+    body:
+      "At seventeen he took a flight to the United Kingdom alone, from a small town in Sindh, Pakistan, without knowing a single person on the other side. It became the pattern he has kept since: do the thing that frightens you, and learn from whatever breaks.",
+  },
+  {
+    id: "about-off-the-clock",
+    room: "about",
+    title: "Off the Clock",
+    meta: "Practice and pastime",
+    body:
+      "He meditates daily and keeps a journal every night, mostly to stay honest about where he actually is. Away from code he works behind a bar, runs the International Society as its president, and does student ambassador work. What time is left goes on films, and on whatever music has his attention that week.",
+  },
+];
+
+/**
+ * The Experience room: everything he has done, in six cases. The three
+ * roles come first, most recent first, one case each; then education, the
+ * awards and certificates together, and the work done alongside the
+ * degree. Built from the site's own records, so a change there changes the
+ * case.
+ */
+export const experienceExhibits: ExhibitDatum[] = [
   ...experience.map((job) => ({
     id: `exp-${job.slug}`,
-    room: "about" as RoomId,
+    room: "experience" as RoomId,
     title: job.org,
     meta: [job.role, job.dates, job.location].filter(Boolean).join(" · "),
     bullets: job.bullets,
-    links: [{ label: "View this role", href: `/experience/${job.slug}` }],
   })),
-  ...education.map((entry) => ({
-    id: `edu-${entry.title}`,
-    room: "about" as RoomId,
-    title: entry.title,
-    meta: `${entry.place} · ${entry.dates}`,
-    body: entry.note,
-  })),
+  {
+    id: "exp-education",
+    room: "experience",
+    title: "Education",
+    meta: "Royal Holloway · City School and College",
+    bullets: education.map((entry) =>
+      [`${entry.title}, ${entry.place}, ${entry.dates}.`, entry.note].filter(Boolean).join(" "),
+    ),
+  },
+  {
+    id: "exp-recognition",
+    room: "experience",
+    title: "Awards and certificates",
+    meta: "Competitions, practice and a job simulation",
+    bullets: [
+      ...achievements,
+      ...certifications.map((cert) => `${cert.name}, issued ${cert.issued}.`),
+    ],
+  },
+  {
+    id: "exp-alongside",
+    room: "experience",
+    title: "Alongside the degree",
+    meta: "Work that is not on the CV",
+    body:
+      "Behind a bar, as a student ambassador and in hall life, and cutting video: he began editing at thirteen and was freelancing by fifteen.",
+  },
 ];
 
+/**
+ * Projects that stand in the Projects room.
+ *
+ * `reclaim` is held back deliberately. Five cases filled the back wall
+ * edge to edge with no air between them, and a room that is full is a
+ * storeroom rather than a gallery. It is still on the 2D site at
+ * /work/reclaim; only the vitrine is gone.
+ */
+const HELD_BACK = new Set(["reclaim"]);
+
 export const projectExhibits: ExhibitDatum[] = projects
-  .filter((project) => !isDesign(project.tags))
+  .filter((project) => !isDesign(project.tags) && !HELD_BACK.has(project.slug))
   .map((project) => ({
     id: `proj-${project.slug}`,
     room: "projects",
@@ -86,10 +156,9 @@ export const projectExhibits: ExhibitDatum[] = projects
     meta: `${project.stack.join(" · ")} · ${project.year}`,
     body: project.summary,
     bullets: project.highlights,
-    links: [
-      { label: "Open case study", href: `/work/${project.slug}` },
-      ...(project.live ? [{ label: "Live site", href: project.live, external: true }] : []),
-      ...(project.repo ? [{ label: "Code", href: project.repo, external: true }] : []),
+    actions: [
+      { label: "Live website", href: project.live },
+      { label: "Code", href: project.repo },
     ],
   }));
 
@@ -98,7 +167,7 @@ export const skillExhibits: ExhibitDatum[] = skills.map((group) => ({
   room: "skills",
   title: group.title,
   meta: `${group.items.length} tools`,
-  bullets: group.items,
+  tools: [...group.items],
 }));
 
 export const artExhibits: ExhibitDatum[] = projects
@@ -110,7 +179,6 @@ export const artExhibits: ExhibitDatum[] = projects
     meta: project.stack.join(" · "),
     body: project.summary,
     bullets: project.highlights,
-    links: [{ label: "See the work", href: `/work/${project.slug}` }],
   }));
 
 export const contactExhibits: ExhibitDatum[] = [
@@ -136,7 +204,6 @@ export const resumeExhibits: ExhibitDatum[] = [
     meta: `${site.role} · ${site.location}`,
     body: site.bio,
     links: [
-      { label: "Open the full resume", href: "/resume" },
       { label: site.email, href: `mailto:${site.email}` },
     ],
   },
@@ -150,61 +217,76 @@ export const resumeExhibits: ExhibitDatum[] = [
  * matches CASE_POSITIONS, and the index picks which hologram is shown.
  */
 export const caseExhibits: ExhibitDatum[] = [
+  /*
+    Written as museum object labels: what the thing is, who made it and
+    when where that is known, then a sentence or two of plain fact.
+    Labels in a real museum are dry on purpose - the object carries the
+    feeling, and the text only tells you what you are looking at.
+  */
   {
     id: "case-first-phone",
     room: "about",
     title: "Samsung Galaxy J2",
-    meta: "First phone",
-    body:
-      "Daksh's first mobile phone, which he got in second standard. Everything since started somewhere, and for him it started here.",
+    meta: "Mobile telephone. Samsung, 2015",
+    body: "His first phone.",
     links: [{ label: "Model credits", href: "/credits" }],
   },
   {
     id: "case-first-laptop",
     room: "about",
     title: "HP 14",
-    meta: "First laptop",
-    body:
-      "His first laptop, at thirteen. This is the machine he started coding and video editing on, and the point where making things stopped being something other people did.",
+    meta: "Laptop computer. Hewlett-Packard",
+    body: "His first laptop, and the machine he learned to code and edit video on.",
     links: [{ label: "Model credits", href: "/credits" }],
   },
   {
     id: "case-quantum",
     room: "skills",
     title: "Quantum Computing",
-    meta: "Superconducting qubits",
+    meta: "Model of a dilution refrigerator",
     body:
-      "Daksh loves studying quantum computers and the technology behind them. The chandelier everyone pictures is the dilution refrigerator, not the processor: each stage takes the qubits closer to absolute zero, because a coherent state only survives once thermal noise is almost entirely gone.",
+      "The gold chandelier usually pictured as a quantum computer is the refrigerator around it. Each stage is colder than the one above, until the qubits at the bottom sit a fraction of a degree above absolute zero, where their quantum states last long enough to compute with. A subject he reads about for its own sake.",
   },
   {
     id: "case-brain",
     room: "about",
     title: "Brain and Neurons",
-    meta: "AI and the mind",
+    meta: "Anatomical model",
     body:
-      "Daksh loves reading about how AI is transforming us at the neuron level, and what it is doing to our brains. The overlap between how these models learn and how we do is the part he keeps coming back to.",
+      "He reads about how working with AI changes the way people think, and about where the way these models learn resembles the way we do.",
     links: [{ label: "Model credits", href: "/credits" }],
   },
   {
     id: "case-cinema",
     room: "art",
     title: "Cinema",
-    meta: "Escapism",
-    body:
-      "He loves watching films. Cinema is escapism for him, and the one thing that is reliably not work.",
+    meta: "Film camera",
+    body: "He watches a great deal of film. It is the one thing he does that is never work.",
   },
   {
     id: "case-claude",
     room: "skills",
     title: "Claude",
-    meta: "Most-used AI tool",
+    meta: "Language model. Anthropic",
+    body: "The AI tool he uses most, and has since shortly after it was released.",
+  },
+];
+
+/** The photograph hung in the hall itself, on the right-hand wall before the first door. */
+export const hallExhibits: ExhibitDatum[] = [
+  {
+    id: "hall-flight",
+    room: "about",
+    title: "The Flight Over",
+    meta: "Photograph. On the way to the United Kingdom, aged 17",
     body:
-      "The AI tool he uses more than any other, and has done since not long after it launched, well before most people were paying attention.",
+      "Daksh at seventeen, on the flight to the UK. He made the journey alone, leaving a small town in Sindh, Pakistan, for a country where he did not know a single person. Most of what hangs in this museum came after this flight.",
   },
 ];
 
 export const exhibitsByRoom: Record<RoomId, ExhibitDatum[]> = {
   about: aboutExhibits,
+  experience: experienceExhibits,
   projects: projectExhibits,
   skills: skillExhibits,
   art: artExhibits,
@@ -214,7 +296,9 @@ export const exhibitsByRoom: Record<RoomId, ExhibitDatum[]> = {
 
 export const allExhibits: ExhibitDatum[] = [
   ...caseExhibits,
+  ...hallExhibits,
   ...aboutExhibits,
+  ...experienceExhibits,
   ...projectExhibits,
   ...skillExhibits,
   ...artExhibits,

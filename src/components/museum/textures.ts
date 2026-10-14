@@ -2318,3 +2318,175 @@ export function getSeamBurst(): THREE.Texture | null {
   burstCache = tex;
   return tex;
 }
+
+let plasterCache: { map: THREE.Texture; normalMap: THREE.Texture; roughnessMap: THREE.Texture } | null = null;
+
+/**
+ * Sandstone plaster for the rooms: one continuous surface.
+ *
+ * The cladding it replaces is a grid of large panels with dark recessed
+ * seams, and in a room that grid was the busiest thing in the frame -
+ * louder than anything on show. This is laid in long shallow courses, with
+ * joints so soft they only appear where light rakes across them, and the
+ * stone itself carries the interest: a slow mottle, a finer grain, and a
+ * little difference from one block to the next. The relief is low, so it
+ * reads as dressed stone under a lamp rather than as tiles.
+ *
+ * One tile covers PLASTER_TILE world units: six courses of two blocks.
+ */
+export const PLASTER_TILE = 4.8;
+
+export function getPlaster() {
+  if (plasterCache) return plasterCache;
+
+  const S = 512;
+  const mk = () => {
+    const c = document.createElement("canvas");
+    c.width = c.height = S;
+    return c;
+  };
+  const albedo = mk();
+  const heightC = mk();
+  const rough = mk();
+  const a = albedo.getContext("2d", { willReadFrequently: true });
+  const h = heightC.getContext("2d", { willReadFrequently: true });
+  const r = rough.getContext("2d", { willReadFrequently: true });
+  if (!a || !h || !r) return null;
+
+  const rand = seededRandom(48213);
+
+  a.fillStyle = "#ffffff";
+  a.fillRect(0, 0, S, S);
+  h.fillStyle = "#c8c8c8";
+  h.fillRect(0, 0, S, S);
+  // matte: ~0.9 once the material's own roughness multiplies it
+  r.fillStyle = "#f2f2f2";
+  r.fillRect(0, 0, S, S);
+
+  const COURSES = 6;
+  const BLOCKS = 2;
+  const courseH = S / COURSES;
+  const blockW = S / BLOCKS;
+
+  // a faint difference from block to block, so the coursing is felt more than seen
+  for (let row = 0; row < COURSES; row += 1) {
+    const offset = row % 2 === 0 ? 0 : blockW / 2;
+    for (let col = -1; col <= BLOCKS; col += 1) {
+      const v = 0.012 + rand() * 0.022;
+      a.fillStyle = rand() > 0.5 ? `rgba(255,246,228,${v})` : `rgba(74,60,42,${v})`;
+      a.fillRect(col * blockW + offset, row * courseH, blockW, courseH);
+    }
+  }
+
+  // the joints: thin, soft, barely darker, and only a whisper of depth
+  const soft = (ctx: CanvasRenderingContext2D) => {
+    ctx.filter = "blur(1.4px)";
+  };
+  for (const ctx of [a, h]) soft(ctx);
+  const joint = (x: number, y: number, w: number, hh: number) => {
+    a.fillStyle = "rgba(92,76,54,0.16)";
+    a.fillRect(x, y, w, hh);
+    h.fillStyle = "#a9a9a9";
+    h.fillRect(x, y, w, hh);
+  };
+  for (let row = 0; row <= COURSES; row += 1) joint(0, row * courseH - 1.5, S, 3);
+  for (let row = 0; row < COURSES; row += 1) {
+    const offset = row % 2 === 0 ? 0 : blockW / 2;
+    for (let col = 0; col <= BLOCKS; col += 1) {
+      joint(col * blockW + offset - 1.5, row * courseH, 3, courseH);
+    }
+  }
+  for (const ctx of [a, h]) ctx.filter = "none";
+
+  /*
+    The stone: a slow mottle, a medium cloud and a fine grain, all of it
+    wrapped so the tile repeats without a seam. Written into the height and
+    roughness as well, at lower strength, so the grain is lit rather than
+    printed.
+  */
+  const lattice = (period: number) => {
+    const n = Math.max(2, Math.floor(S / period));
+    const g = new Float32Array(n * n);
+    for (let i = 0; i < g.length; i += 1) g[i] = rand();
+    return (x: number, y: number) => {
+      const fx = (x / period) % n;
+      const fy = (y / period) % n;
+      const x0 = Math.floor(fx);
+      const y0 = Math.floor(fy);
+      const x1 = (x0 + 1) % n;
+      const y1 = (y0 + 1) % n;
+      const tx = fx - x0;
+      const ty = fy - y0;
+      const sx = tx * tx * (3 - 2 * tx);
+      const sy = ty * ty * (3 - 2 * ty);
+      const p0 = g[y0 * n + x0] * (1 - sx) + g[y0 * n + x1] * sx;
+      const p1 = g[y1 * n + x0] * (1 - sx) + g[y1 * n + x1] * sx;
+      return p0 * (1 - sy) + p1 * sy;
+    };
+  };
+  const slow = lattice(128);
+  const cloud = lattice(32);
+  const fine = lattice(5);
+
+  const ai = a.getImageData(0, 0, S, S);
+  const hi = h.getImageData(0, 0, S, S);
+  const ri = r.getImageData(0, 0, S, S);
+  for (let y = 0; y < S; y += 1) {
+    for (let x = 0; x < S; x += 1) {
+      const i = (y * S + x) * 4;
+      const tone = (slow(x, y) - 0.5) * 16 + (cloud(x, y) - 0.5) * 9;
+      const grain = (fine(x, y) - 0.5) * 8 + (rand() - 0.5) * 6;
+      const v = tone + grain;
+      ai.data[i] = Math.max(0, Math.min(255, ai.data[i] + v));
+      ai.data[i + 1] = Math.max(0, Math.min(255, ai.data[i + 1] + v * 0.95));
+      ai.data[i + 2] = Math.max(0, Math.min(255, ai.data[i + 2] + v * 0.84));
+      hi.data[i] = hi.data[i + 1] = hi.data[i + 2] = Math.max(0, Math.min(255, hi.data[i] + grain * 0.9));
+      ri.data[i] = ri.data[i + 1] = ri.data[i + 2] = Math.max(0, Math.min(255, ri.data[i] + grain * 1.2 - tone * 0.4));
+    }
+  }
+  a.putImageData(ai, 0, 0);
+  h.putImageData(hi, 0, 0);
+  r.putImageData(ri, 0, 0);
+
+  const map = new THREE.CanvasTexture(albedo);
+  map.colorSpace = THREE.SRGBColorSpace;
+  // low relief: soft joints and grain, not tile edges
+  const normalMap = heightToNormal(heightC, 1.4);
+  if (!normalMap) return null;
+  const roughnessMap = new THREE.CanvasTexture(rough);
+
+  for (const t of [map, normalMap, roughnessMap]) {
+    t.wrapS = t.wrapT = THREE.RepeatWrapping;
+    t.anisotropy = 8;
+    t.generateMipmaps = true;
+    t.minFilter = THREE.LinearMipmapLinearFilter;
+    t.needsUpdate = true;
+  }
+  plasterCache = { map, normalMap, roughnessMap };
+  return plasterCache;
+}
+
+const plasterRepeatCache = new Map<string, NonNullable<ReturnType<typeof getPlaster>>>();
+
+/** The plaster set tiled for a surface `rx` by `ry` tiles across. Shared per tiling; never disposed. */
+export function plasterFor(rx: number, ry: number) {
+  const base = getPlaster();
+  if (!base) return null;
+  const key = `${Math.round(rx * 4) / 4}x${Math.round(ry * 4) / 4}`;
+  const hit = plasterRepeatCache.get(key);
+  if (hit) return hit;
+  const clone = (t: THREE.Texture) => {
+    const x = t.clone();
+    x.wrapS = x.wrapT = THREE.RepeatWrapping;
+    x.repeat.set(rx, ry);
+    x.needsUpdate = true;
+    return x;
+  };
+  const set = {
+    map: clone(base.map),
+    normalMap: clone(base.normalMap),
+    roughnessMap: clone(base.roughnessMap),
+  };
+  plasterRepeatCache.set(key, set);
+  return set;
+}

@@ -2,14 +2,38 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useFrame } from "@react-three/fiber";
+import { RoundedBox } from "@react-three/drei";
 import * as THREE from "three";
 import { consumedDrag } from "./lookControls";
-import { GOLD, GOLD_HOT } from "./theme";
+import { GOLD } from "./theme";
+
+/** Cold grey, not gold. The only warm thing in a case is its light. */
+const FRAME_METAL = "#7d8794";
+/*
+  The case's own light: warm gold, and tone-mapped like everything else.
+  It used to run untone-mapped at full strength, which under bloom came out
+  as the whitest thing in the room - the lid of every case a bar of white.
+  This is under half of that, and it stays gold.
+*/
+const CASE_LIGHT = "#e0b070";
+
+/* the plinth: dark lacquer on a darker base, with bronze at the fillet, the cap and the panel moulding */
+const PLINTH_BASE = "#120d08";
+const PLINTH_BODY = "#2a1d13";
+const PANEL = "#30221a";
+const BRONZE = "#4a3820";
+const BRASS = "#b8935a";
+
+/** How big a logo is in its case, against the size it was drawn at. */
+const ICON_SCALE = 0.62;
+import { getGlassSmudge, brushedMetalFor, getContactShadow } from "./textures";
 import { isShown } from "./visibility";
+import { RoomIcon } from "./RoomIcon";
+import type { RoomIconId } from "./roomIcons";
 
-export type VitrineShape = "icosahedron" | "sphere" | "octahedron" | "box" | "torus" | "screen";
+export type VitrineShape = "icosahedron" | "sphere" | "octahedron" | "box" | "torus" | "screen" | "icon";
 
-function ExhibitGeometry({ shape }: { shape: Exclude<VitrineShape, "screen"> }) {
+function ExhibitGeometry({ shape }: { shape: Exclude<VitrineShape, "screen" | "icon"> }) {
   switch (shape) {
     case "icosahedron":
       return <icosahedronGeometry args={[0.34, 0]} />;
@@ -85,17 +109,33 @@ export function Vitrine({
   position,
   shape,
   seed = 0,
+  icon,
+  faceYaw = 0,
   screenTitle,
   screenSubtitle,
-  height = 0.95,
-  caseHeight = 1.35,
-  caseWidth = 1.05,
+  /*
+    Proportioned for what is actually in it.
+
+    The corridor cases are five metres of glass because they hold real
+    objects - a camera, a laptop. These hold a single small solid, and
+    at that height the case was mostly empty air with something adrift
+    near the bottom. A tall plinth and a shorter case puts the piece at
+    the height you look at it and leaves the glass doing its job rather
+    than filling the room.
+  */
+  height = 1.6,
+  caseHeight = 2.9,
+  caseWidth = 2.0,
   active = false,
   onSelect,
 }: {
   position: [number, number, number];
   shape: VitrineShape;
   seed?: number;
+  /** For shape "icon": which logo stands in the case. */
+  icon?: RoomIconId;
+  /** For shape "icon": the turn that squares the logo to whoever walks in. */
+  faceYaw?: number;
   screenTitle?: string;
   screenSubtitle?: string;
   height?: number;
@@ -106,6 +146,20 @@ export function Vitrine({
 }) {
   const coreRef = useRef<THREE.Group>(null);
   const glassRef = useRef<THREE.Mesh>(null);
+  const smudge = useMemo(() => getGlassSmudge(), []);
+  const brushed = useMemo(() => brushedMetalFor(2, 1), []);
+  const contact = useMemo(() => getContactShadow(), []);
+  /** The shapes were drawn for a case half this size. */
+  const coreScale = (caseWidth / 1.05) * 0.78;
+  /*
+    The logos were filling their cases edge to edge, which is what made a
+    case read as a block with a picture on it. Smaller, they read as an
+    object on a mount with glass and air round it.
+  */
+  const pieceScale = coreScale * (shape === "icon" ? ICON_SCALE : 1);
+  /* how far below its centre the piece stops, so the mount rod meets it */
+  const pieceHalf =
+    (shape === "icon" ? 0.49 : shape === "screen" ? 0.245 : 0.36) * pieceScale;
   const screenTexture = useScreenTexture(screenTitle, screenSubtitle);
   const [hovered, setHovered] = useState(false);
   const floatBase = height + caseHeight * 0.45;
@@ -122,8 +176,18 @@ export function Vitrine({
   useFrame((state, delta) => {
     const core = coreRef.current;
     if (!isShown(core)) return;
-    core.rotation.y += delta * (shape === "screen" ? 0.08 : lit ? 0.7 : 0.26);
-    core.position.y = floatBase + Math.sin(state.clock.elapsedTime * 0.9 + seed) * 0.045;
+    if (shape === "icon") {
+      /*
+        A plaque, not a solid: spun all the way round it spends half its
+        time edge-on or showing its back, and a logo should be read.
+        Swaying either side of the face keeps it toward the visitor and
+        still shows its thickness and its bevel catching the light.
+      */
+      core.rotation.y = Math.sin(state.clock.elapsedTime * 0.55 + seed) * (lit ? 1.0 : 0.72);
+    } else {
+      core.rotation.y += delta * (shape === "screen" ? 0.08 : lit ? 0.7 : 0.26);
+    }
+    /* no bob: the piece is on a mount now, and a mounted thing does not drift */
 
     // the case "unseals" a touch when selected or hovered
     const glass = glassRef.current;
@@ -134,35 +198,226 @@ export function Vitrine({
     }
   });
 
+  /* the plinth, from the floor up */
+  const TOE = 0.12;
+  const FILLET = 0.05;
+  const CAP = 0.09;
+  const bodyBottom = TOE + FILLET;
+  const bodyH = height - bodyBottom - CAP;
+  const bodyW = caseWidth * 1.04;
+  /* inside the case: the deck, then a riser the mount stands on */
+  const deckY = height + 0.06;
+  const RISER = 0.1;
+  const riserTop = deckY + RISER;
+  const rodTop = floatBase - pieceHalf + 0.03;
+
   return (
     <group position={position}>
-      {/* pedestal */}
-      <mesh position={[0, height / 2, 0]}>
-        <boxGeometry args={[caseWidth * 0.92, height, caseWidth * 0.92]} />
-        <meshStandardMaterial color="#0e0e10" roughness={0.28} metalness={0.55} />
-      </mesh>
-      {/* lit cap the case sits on */}
-      <mesh position={[0, height + 0.015, 0]}>
-        <boxGeometry args={[caseWidth, 0.03, caseWidth]} />
+      {/*
+        The plinth, built the way a cabinetmaker would build one rather
+        than as a single block: a dark base moulding at the floor, a bronze
+        fillet above it, the body, and a bronze cap that oversails it.
+        Every edge is eased, so each one catches a line of light - a box
+        with knife-edge corners has none, which is most of why the old one
+        looked like a stack of cubes.
+      */}
+      <RoundedBox args={[caseWidth * 1.12, TOE, caseWidth * 1.12]} radius={0.02} smoothness={3} position={[0, TOE / 2, 0]}>
+        <meshStandardMaterial color={PLINTH_BASE} roughness={0.5} metalness={0.2} envMapIntensity={0.6} />
+      </RoundedBox>
+      <RoundedBox
+        args={[caseWidth * 1.08, FILLET, caseWidth * 1.08]}
+        radius={0.016}
+        smoothness={3}
+        position={[0, TOE + FILLET / 2, 0]}
+      >
+        <meshStandardMaterial color={BRONZE} roughness={0.38} metalness={0.75} envMapIntensity={1.2} />
+      </RoundedBox>
+      <RoundedBox args={[bodyW, bodyH, bodyW]} radius={0.03} smoothness={3} position={[0, bodyBottom + bodyH / 2, 0]}>
+        {/* dark lacquer, its grain only where the light catches it */}
         <meshStandardMaterial
-          color={GOLD}
-          emissive={GOLD}
-          emissiveIntensity={lit ? 3.2 : 1.6}
-          toneMapped={false}
+          color={PLINTH_BODY}
+          roughnessMap={brushed?.roughnessMap ?? null}
+          roughness={0.5}
+          metalness={0.08}
+          envMapIntensity={0.75}
+        />
+      </RoundedBox>
+      <RoundedBox args={[caseWidth * 1.1, CAP, caseWidth * 1.1]} radius={0.025} smoothness={3} position={[0, height - CAP / 2, 0]}>
+        <meshStandardMaterial color={BRONZE} roughness={0.34} metalness={0.78} envMapIntensity={1.3} />
+      </RoundedBox>
+
+      {/*
+        An inset panel on the face you walk up to, framed by a fine bronze
+        moulding, where the label sits. It is what turns a block into a
+        piece of furniture.
+      */}
+      <group rotation={[0, faceYaw, 0]}>
+        <mesh position={[0, bodyBottom + bodyH / 2, bodyW / 2 + 0.002]}>
+          <planeGeometry args={[caseWidth * 0.78, bodyH * 0.74]} />
+          <meshStandardMaterial color={PANEL} roughness={0.62} metalness={0.06} envMapIntensity={0.5} />
+        </mesh>
+        {[
+          { p: [0, bodyH * 0.37, 0], s: [caseWidth * 0.8, 0.035, 0.03] },
+          { p: [0, -bodyH * 0.37, 0], s: [caseWidth * 0.8, 0.035, 0.03] },
+          { p: [-caseWidth * 0.39, 0, 0], s: [0.035, bodyH * 0.74 + 0.035, 0.03] },
+          { p: [caseWidth * 0.39, 0, 0], s: [0.035, bodyH * 0.74 + 0.035, 0.03] },
+        ].map((m, i) => (
+          <RoundedBox
+            key={i}
+            args={m.s as [number, number, number]}
+            radius={0.008}
+            smoothness={2}
+            position={[m.p[0], bodyBottom + bodyH / 2 + m.p[1], bodyW / 2 + 0.012]}
+          >
+            <meshStandardMaterial color={BRONZE} roughness={0.36} metalness={0.7} envMapIntensity={1.2} />
+          </RoundedBox>
+        ))}
+      </group>
+
+      {/*
+        A painted contact shadow under the plinth.
+
+        A shadow map cannot resolve the very tight, very dark line right
+        where an object meets the floor - it is below the resolution of
+        the map. Compositing an ambient-occlusion decal there is what
+        stops furniture looking like it is hovering a centimetre up.
+      */}
+      <mesh position={[0, 0.006, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+        <planeGeometry args={[caseWidth * 1.8, caseWidth * 1.8]} />
+        <meshBasicMaterial
+          color="#000000"
+          transparent
+          opacity={0.42}
+          depthWrite={false}
+          map={contact ?? undefined}
         />
       </mesh>
 
-      {/* internal light, hidden at the top of the pedestal, throwing up
-          into the case — separate from the room's main spotlight */}
-      <pointLight
-        position={[0, height + 0.12, 0]}
-        color={GOLD_HOT}
-        intensity={lit ? 7 : 3.2}
-        distance={lit ? 3.6 : 2.6}
-        decay={2}
-      />
+      {/* the deck inside the case: a brushed plate */}
+      <mesh position={[0, deckY + 0.002, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+        <planeGeometry args={[caseWidth * 0.94, caseWidth * 0.94]} />
+        <meshStandardMaterial
+          color="#14110d"
+          roughnessMap={brushed?.roughnessMap ?? null}
+          roughness={0.5}
+          metalness={0.3}
+          envMapIntensity={0.5}
+        />
+      </mesh>
 
-      <group ref={coreRef} position={[0, floatBase, 0]}>
+      {/*
+        The mount: a small eased riser and a slim brass rod up to the
+        piece, the way a museum shows a small object. Nothing in a real
+        case floats.
+      */}
+      <RoundedBox args={[caseWidth * 0.42, RISER, caseWidth * 0.42]} radius={0.02} smoothness={3} position={[0, deckY + RISER / 2, 0]}>
+        <meshStandardMaterial color={PLINTH_BODY} roughness={0.45} metalness={0.15} envMapIntensity={0.8} />
+      </RoundedBox>
+      <mesh position={[0, (riserTop + rodTop) / 2, 0]}>
+        <cylinderGeometry args={[0.014, 0.014, Math.max(0.05, rodTop - riserTop), 12]} />
+        <meshStandardMaterial color={BRASS} roughness={0.3} metalness={1} envMapIntensity={1.4} />
+      </mesh>
+
+      {/*
+        The frame, and why it is thin and cold.
+
+        Bronze posts with a cornice over them is Victorian cabinetry -
+        the case read as furniture an object had been put away in. A
+        futuristic vitrine is mostly glass held by as little as it can
+        get away with, in a metal that is grey rather than golden, so
+        the only warm thing in the piece is the light inside it.
+
+        Thin posts with their arrises eased, each with a lit seam let into
+        its inner face.
+      */}
+      {([[-1, -1], [-1, 1], [1, -1], [1, 1]] as const).map(([sx, sz]) => (
+        <group
+          key={`${sx}${sz}`}
+          position={[
+            sx * (caseWidth / 2 - 0.02),
+            height + caseHeight / 2 + 0.03,
+            sz * (caseWidth / 2 - 0.02),
+          ]}
+        >
+          <RoundedBox args={[0.045, caseHeight, 0.045]} radius={0.01} smoothness={2}>
+            <meshStandardMaterial
+              color={FRAME_METAL}
+              roughness={0.24}
+              metalness={0.96}
+              envMapIntensity={1.7}
+            />
+          </RoundedBox>
+          {/* the seam of light down the inside of the post */}
+          <mesh position={[-sx * 0.025, 0, -sz * 0.025]}>
+            <boxGeometry args={[0.012, caseHeight * 0.94, 0.012]} />
+            <meshStandardMaterial
+              color={CASE_LIGHT}
+              emissive={CASE_LIGHT}
+              emissiveIntensity={lit ? 1.6 : 1}
+            />
+          </mesh>
+        </group>
+      ))}
+
+      {/* a shallow sill where the glass meets the plinth */}
+      <RoundedBox args={[caseWidth + 0.06, 0.06, caseWidth + 0.06]} radius={0.014} smoothness={2} position={[0, height + 0.03, 0]}>
+        <meshStandardMaterial
+          color={FRAME_METAL}
+          roughness={0.26}
+          metalness={0.94}
+          envMapIntensity={1.5}
+        />
+      </RoundedBox>
+
+      {/*
+        The head: a thin cap, and the light the case is actually lit by.
+
+        The strip faces down into the volume from just under the cap, so
+        the glass catches along its top edge and the piece below is lit
+        from above - which is where an edge-lit case puts its light. It
+        is emissive, not a lamp: a light per case would change the
+        scene's light count from room to room and recompile every
+        material in the museum on the click that opens a door.
+      */}
+      <RoundedBox
+        args={[caseWidth + 0.08, 0.08, caseWidth + 0.08]}
+        radius={0.016}
+        smoothness={2}
+        position={[0, height + caseHeight + 0.06, 0]}
+      >
+        <meshStandardMaterial
+          color={FRAME_METAL}
+          roughness={0.22}
+          metalness={0.96}
+          envMapIntensity={1.8}
+        />
+      </RoundedBox>
+      <mesh position={[0, height + caseHeight - 0.01, 0]}>
+        <boxGeometry args={[caseWidth - 0.06, 0.03, caseWidth - 0.06]} />
+        <meshStandardMaterial
+          color={CASE_LIGHT}
+          emissive={CASE_LIGHT}
+          emissiveIntensity={lit ? 2.2 : 1.4}
+        />
+      </mesh>
+
+      {/*
+        And the pool of light the mount stands in: a soft ring on the deck
+        round the riser, so the glow inside the case has somewhere to come
+        from.
+      */}
+      <mesh position={[0, deckY + 0.004, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+        <ringGeometry args={[caseWidth * 0.24, caseWidth * 0.38, 48]} />
+        <meshStandardMaterial
+          color={CASE_LIGHT}
+          emissive={CASE_LIGHT}
+          emissiveIntensity={lit ? 0.9 : 0.55}
+          transparent
+          opacity={0.7}
+        />
+      </mesh>
+
+      <group ref={coreRef} position={[0, floatBase, 0]} scale={pieceScale}>
         {shape === "screen" && screenTexture ? (
           <mesh>
             <planeGeometry args={[0.78, 0.49]} />
@@ -175,6 +430,12 @@ export function Vitrine({
               side={THREE.DoubleSide}
             />
           </mesh>
+        ) : shape === "icon" ? (
+          icon ? (
+            <group rotation={[0, faceYaw, 0]}>
+              <RoomIcon id={icon} />
+            </group>
+          ) : null
         ) : shape !== "screen" ? (
           <mesh>
             <ExhibitGeometry shape={shape} />
@@ -217,17 +478,25 @@ export function Vitrine({
         }}
       >
         <boxGeometry args={[caseWidth, caseHeight, caseWidth]} />
+        {/*
+          Glass is never perfectly clean or perfectly even. A smudge map
+          on the roughness channel gives the surface something to catch
+          light on, which is the difference between a pane and a flat
+          tinted quad - the reflections break up instead of sliding
+          across as one sheet. Same treatment as the hall.
+        */}
         <meshPhysicalMaterial
           transmission={0}
-          ior={1.5}
-          roughness={0.06}
+          roughnessMap={smudge ?? undefined}
+          roughness={0.16}
           metalness={0}
+          ior={1.46}
+          specularIntensity={1}
           clearcoat={1}
           clearcoatRoughness={0.04}
-          specularIntensity={1}
           transparent
-          opacity={0.16}
-          color={lit ? "#fff4de" : "#f6ead6"}
+          opacity={0.15}
+          color={lit ? "#f6fbff" : "#eef4fb"}
         />
       </mesh>
     </group>

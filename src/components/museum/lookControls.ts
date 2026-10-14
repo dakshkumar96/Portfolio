@@ -25,7 +25,7 @@ const MAX_PITCH = 0.32;
 /** Past this much movement the gesture is a look, not a click. */
 const DRAG_THRESHOLD = 6;
 
-export type LookState = { yaw: number; pitch: number };
+export type LookState = { yaw: number; pitch: number; dragging: boolean };
 
 let dragged = false;
 
@@ -35,7 +35,7 @@ export function consumedDrag() {
 }
 
 export function useLookControls() {
-  const look = useRef<LookState>({ yaw: 0, pitch: 0 });
+  const look = useRef<LookState>({ yaw: 0, pitch: 0, dragging: false });
 
   useEffect(() => {
     let active = false;
@@ -47,6 +47,7 @@ export function useLookControls() {
       // left button only, so context menus and middle-click are untouched
       if (e.button !== 0) return;
       active = true;
+      look.current.dragging = true;
       dragged = false;
       travelled = 0;
       lastX = e.clientX;
@@ -63,15 +64,37 @@ export function useLookControls() {
       travelled += Math.abs(dx) + Math.abs(dy);
       if (travelled > DRAG_THRESHOLD) dragged = true;
 
+      /*
+        How far the view turns per pixel dragged.
+
+        At 0.0022 it took nearly three hundred pixels of drag to reach
+        the clamp - most of a screen to look thirty-five degrees, which
+        feels like the camera is resisting you rather than following.
+        This covers the same range in about two hundred.
+      */
       const l = look.current;
-      l.yaw = Math.max(-MAX_YAW, Math.min(MAX_YAW, l.yaw - dx * 0.0022));
-      l.pitch = Math.max(-MAX_PITCH, Math.min(MAX_PITCH, l.pitch - dy * 0.0016));
+      l.yaw = Math.max(-MAX_YAW, Math.min(MAX_YAW, l.yaw - dx * 0.0032));
+      l.pitch = Math.max(-MAX_PITCH, Math.min(MAX_PITCH, l.pitch - dy * 0.0024));
       if (dragged) document.body.style.cursor = "grabbing";
     };
 
     const up = () => {
       if (!active) return;
       active = false;
+
+      /*
+        Let go and the view comes back.
+
+        Holding the angle you dragged to meant every shot after a look
+        was off-axis, and the hall is built to be seen straight down.
+        Releasing returns the target to centre; CameraRig eases it back
+        rather than snapping, and uses a gentler damping for the return
+        than for the drag itself.
+      */
+      look.current.yaw = 0;
+      look.current.pitch = 0;
+      look.current.dragging = false;
+
       document.body.style.cursor = "";
       // cleared on the next frame, after any click handler has read it
       requestAnimationFrame(() => {

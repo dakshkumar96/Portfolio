@@ -4,23 +4,26 @@ import { memo, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import * as THREE from "three";
 import { useFrame } from "@react-three/fiber";
-import { Instance, Instances } from "@react-three/drei";
+import { Html } from "@react-three/drei";
 import {
-  getVistaWall,
   getGlassSmudge,
   claddingFor,
   blackBrickFor,
   brushedMetalFor,
   getContactShadow,
-  runeCircuitFor,
 } from "./textures";
-import { WallInscriptions, WallArt, WallLamp, LAMP_DROP, LAMP_REACH } from "./WallContent";
-import { Atrium } from "./Atrium";
+import { getAjrakRelief, getBossEngraving, getWalnut } from "./doorTextures";
+import { WallInscriptions } from "./WallContent";
+import { HungPicture } from "./PortraitWall";
+import type { PhotoCrop } from "./photoGrade";
+import { Vault, PLASTER } from "./Vault";
+import { Statue, PLINTH_H as STATUE_PLINTH_H } from "./Statue";
+import { RoomShell } from "./RoomShell";
+import { SPOT_COUNT, spotPlan } from "./roomLayout";
 import { CaseContents } from "./CaseModels";
 import { ExhibitText } from "./ExhibitText";
-import { caseExhibits, type ExhibitDatum } from "./exhibitData";
+import { caseExhibits, hallExhibits, type ExhibitDatum } from "./exhibitData";
 import { consumedDrag } from "./lookControls";
-import { inscriptionLines } from "./WallContent";
 import { SHELL, MID, GOLD, LEVEL, EMIT } from "./palette";
 import {
   HALF_WIDTH as HW,
@@ -29,11 +32,9 @@ import {
   Z_FAR,
   WALL_H,
   CASE_POSITIONS,
-  ROOM_DEPTH,
-  ROOM_WIDTH,
   ROOM_H,
   roomCenter,
-  CAM_Y,
+  roomSize,
   DOOR_W,
   DOOR_H,
   DOOR_RECESS,
@@ -305,60 +306,6 @@ function FloorInner() {
   );
 }
 
-/** Room floors use the same pavers, so a chamber reads as part of the hall. */
-function RoomFloor({ cx, cz }: { cx: number; cz: number }) {
-  const [geo, setGeo] = useState<THREE.BufferGeometry | null>(null);
-  useUv1(geo);
-  return (
-    <mesh rotation={[-Math.PI / 2, 0, 0]} position={[cx, 0, cz]}>
-      <planeGeometry ref={setGeo} args={[ROOM_DEPTH, ROOM_WIDTH]} />
-      <BrickMaterial rx={ROOM_DEPTH / BRICK_TILE} ry={ROOM_WIDTH / BRICK_TILE} />
-    </mesh>
-  );
-}
-
-/**
- * And the same slab overhead, at the corridor's own height.
- *
- * This was a plain flat colour while the rooms were alcoves. Once the
- * ceiling runs level out of the hall the join is in shot, and a change
- * of material across it is the one thing that gives away that the room
- * was built separately.
- */
-function RoomCeiling({ cx, cz }: { cx: number; cz: number }) {
-  const [geo, setGeo] = useState<THREE.BufferGeometry | null>(null);
-  useUv1(geo);
-  return (
-    <mesh rotation={[Math.PI / 2, 0, 0]} position={[cx, ROOM_H, cz]}>
-      <planeGeometry ref={setGeo} args={[ROOM_DEPTH, ROOM_WIDTH]} />
-      <BrickMaterial rx={ROOM_DEPTH / BRICK_TILE} ry={ROOM_WIDTH / BRICK_TILE} />
-    </mesh>
-  );
-}
-
-/**
- * One continuous slab. It was previously three strips meeting edge to
- * edge at the same height, and those shared edges were the two diagonal
- * lines running down the centre of the ceiling.
- */
-/**
- * Flat slab, and nothing else.
- *
- * The recessed downlights are gone. They lit the hall, but the fittings
- * were hanging below the slab with their light lower still, so every one
- * of them put a bright patch on the ceiling above itself — the opposite
- * of what a recessed fitting does. The wall lamps carry the corridor.
- */
-function CeilingInner() {
-  const [geo, setGeo] = useState<THREE.BufferGeometry | null>(null);
-  useUv1(geo);
-  return (
-    <mesh position={[0, WALL_H, MID_Z]} rotation={[Math.PI / 2, 0, 0]}>
-      <planeGeometry ref={setGeo} args={[HW * 2, LENGTH]} />
-      <BrickMaterial rx={(HW * 2) / BRICK_TILE} ry={LENGTH / BRICK_TILE} />
-    </mesh>
-  );
-}
 
 /**
  * Pool definition now comes from a tight cone plus low penumbra rather
@@ -430,149 +377,77 @@ function PoolLight({
 }
 
 /**
- * The end of the corridor needs somewhere for the eye to land, or the
- * hall just stops into black. A lit doorway silhouette sits in front of
- * the inscription so there is a destination visible from the entrance.
+ * The end of the corridor: a plain wall, and a statue on a plinth in front
+ * of it, lit from above and a little ahead so it is the one bright thing
+ * at the far end of the hall - the destination the walk is facing.
+ *
+ * The wall is left plain on purpose. It carried the site's text once; now
+ * it is only a ground for the figure, with a soft glow behind it so the
+ * outline reads, and the vault closes over it in one clean curve.
  */
-function FarFocusInner() {
-  const tex = useMemo(() => getVistaWall(inscriptionLines()), []);
-  const OPEN_W = 3.4;
-  const OPEN_H = 6.2;
+const STATUE_Z = Z_FAR + 4.2;
 
+function FarFocusInner() {
+  const halo = useMemo(() => getContactShadow(), []);
   return (
-    <group position={[0, 0, Z_FAR + 0.3]}>
-      {/*
-        The inscription is the wall itself: opaque, covering the full
-        surface edge to edge. It was previously an additive overlay on a
-        panel, which read as a faint patch of script floating in the
-        middle of a dark rectangle.
-      */}
-      <mesh position={[0, WALL_H / 2, -0.28]}>
+    <group>
+      <mesh position={[0, WALL_H / 2, Z_FAR + 0.02]}>
         <planeGeometry args={[HW * 2, WALL_H]} />
         <meshStandardMaterial
-          map={tex ?? undefined}
-          color="#ffffff"
-          roughness={0.88}
-          metalness={0.04}
-          envMapIntensity={0.5}
-          /* the carving itself glows, faintly, as if lit from within */
-          emissiveMap={tex ?? undefined}
-          emissive={GOLD.halo}
-          emissiveIntensity={0.55}
+          color={PLASTER}
+          roughness={0.9}
+          metalness={0}
+          envMapIntensity={0.4}
+          emissive={PLASTER}
+          emissiveIntensity={0.1}
         />
       </mesh>
-      {/* a second, additive pass so the script blooms rather than just
-          being bright — one layer cannot both be stone and be light */}
-      <mesh position={[0, WALL_H / 2, -0.26]}>
-        <planeGeometry args={[HW * 2, WALL_H]} />
+      {/* the glow behind the figure: a soft pool of warm light on the wall */}
+      <mesh position={[0, 4.6, Z_FAR + 0.05]}>
+        <planeGeometry args={[13, 13]} />
         <meshBasicMaterial
-          map={tex ?? undefined}
+          color={GOLD.light}
+          map={halo ?? undefined}
           transparent
-          opacity={0.22}
+          opacity={0.14}
+          blending={THREE.AdditiveBlending}
+          depthWrite={false}
+          toneMapped={false}
+        />
+      </mesh>
+      {/* and on the floor round the plinth */}
+      <mesh position={[0, 0.02, STATUE_Z]} rotation={[-Math.PI / 2, 0, 0]}>
+        <planeGeometry args={[7, 7]} />
+        <meshBasicMaterial
+          color={GOLD.light}
+          map={halo ?? undefined}
+          transparent
+          opacity={0.18}
           blending={THREE.AdditiveBlending}
           depthWrite={false}
           toneMapped={false}
         />
       </mesh>
 
-      {/*
-        The endpoint, finally decided: a commissioned figure on a plinth,
-        the museum's founding piece.
-
-        It read as ambiguous for a long time because it was an unlit
-        silhouette in a bright opening — you could not tell whether it was
-        a person, a doorway or a placeholder. It is resolved here by doing
-        the opposite: the alcove behind goes dark, the figure is pale
-        stone lit hard from the front, and a lit nameplate sits at its
-        foot. Nothing about a plinth, a nameplate and a raking key light
-        reads as anything other than a sculpture.
-      */}
-      <mesh position={[0, OPEN_H / 2, -0.02]}>
-        <planeGeometry args={[OPEN_W, OPEN_H]} />
-        <meshStandardMaterial color={SHELL.recess} roughness={0.95} />
-      </mesh>
-
-      <group position={[0, 0, 0.6]}>
-        {/* stepped plinth */}
-        <mesh position={[0, 0.12, 0]}>
-          <boxGeometry args={[1.7, 0.24, 1.7]} />
-          <meshStandardMaterial color={MID.plinth} roughness={0.7} metalness={0.15} />
-        </mesh>
-        <mesh position={[0, 0.5, 0]}>
-          <cylinderGeometry args={[0.6, 0.68, 0.52, 32]} />
-          <meshStandardMaterial color={MID.stone} roughness={0.62} metalness={0.2} />
-        </mesh>
-
-        {/* the figure */}
-        <mesh position={[0, 1.55, 0]}>
-          <capsuleGeometry args={[0.3, 1.2, 8, 20]} />
-          <meshStandardMaterial color="#b8ac93" roughness={0.88} metalness={0.03} />
-        </mesh>
-        <mesh position={[0, 2.55, 0]}>
-          <sphereGeometry args={[0.25, 24, 24]} />
-          <meshStandardMaterial color="#c2b69c" roughness={0.88} metalness={0.03} />
-        </mesh>
-        {[-1, 1].map((sx) => (
-          <mesh
-            key={sx}
-            position={[sx * 0.36, 1.6, 0.05]}
-            rotation={[0, 0, sx * 0.22]}
-          >
-            <capsuleGeometry args={[0.1, 0.82, 6, 14]} />
-            <meshStandardMaterial color="#b0a48c" roughness={0.88} metalness={0.03} />
-          </mesh>
-        ))}
-
-        {/* the nameplate that settles what it is */}
-        <group position={[0, 0.62, 0.72]} rotation={[-0.5, 0, 0]}>
-          <mesh>
-            <boxGeometry args={[1.0, 0.3, 0.035]} />
-            <meshStandardMaterial
-              color={GOLD.metal}
-              roughness={0.3}
-              metalness={1}
-              envMapIntensity={1.4}
-            />
-          </mesh>
-          <group position={[0, 0.02, 0.03]}>
-            <ExhibitText text="The Visitor" position={[0, 0, 0]} height={0.11} />
-          </group>
-        </group>
-      </group>
-
-      {/* hard frontal key: the only thing lit at this end of the hall */}
-      <PoolLight
-        position={[0, 6.6, 7.5]}
-        target={[0, 1.8, 0.6]}
-        intensity={780}
-        angle={0.26}
-        distance={16}
-        color="#fff2dc"
-      />
-      {/* a weak fill so the shaded side is not solid black */}
-      <PoolLight
-        position={[-3.2, 3.4, 6]}
-        target={[0, 1.6, 0.6]}
-        intensity={90}
-        angle={0.4}
-        distance={12}
-      />
-
-      {/* jamb, so it reads as an opening cut in stone */}
-      {[
-        { p: [-(OPEN_W / 2 + 0.11), OPEN_H / 2, 0.06], s: [0.22, OPEN_H + 0.44, 0.3] },
-        { p: [OPEN_W / 2 + 0.11, OPEN_H / 2, 0.06], s: [0.22, OPEN_H + 0.44, 0.3] },
-        { p: [0, OPEN_H + 0.11, 0.06], s: [OPEN_W + 0.44, 0.22, 0.3] },
-      ].map((b, i) => (
-        <mesh key={i} position={b.p as [number, number, number]}>
-          <boxGeometry args={b.s as [number, number, number]} />
-          <meshStandardMaterial color="#7a6a4e" roughness={0.7} metalness={0.2} />
-        </mesh>
-      ))}
-
-      {/* spill from the aperture back down the hall */}
-      <pointLight position={[0, 3, 5]} color={GOLD.light} intensity={210} distance={40} decay={1.9} />
+      <Statue position={[0, 0, STATUE_Z]} />
     </group>
+  );
+}
+
+/**
+ * The light over the statue, mounted with the other lights on the first
+ * frame so the scene's light count is settled before anything is drawn.
+ */
+function StatueLight() {
+  return (
+    <PoolLight
+      position={[0, WALL_H - 0.6, STATUE_Z + 8.5]}
+      target={[0, STATUE_PLINTH_H + 1.9, STATUE_Z]}
+      intensity={420}
+      angle={0.3}
+      distance={26}
+      color="#ffe2b8"
+    />
   );
 }
 
@@ -712,9 +587,17 @@ function DisplayCase({
         Nothing in here emits its own light any more.
       */}
       {[
-        { x: 0.42, z: 0.42, i: 1, key: true },
-        { x: -0.46, z: 0.3, i: 0.45, key: false },
-        { x: 0.1, z: -0.48, i: 0.3, key: false },
+        /*
+          One lamp per case, not three.
+
+          The two fills ran at 45% and 30% of the key and were there to
+          soften its shadow - but shadows are off, so they were lighting
+          an object the key already lights, from nearly the same place.
+          They were also eighteen spotlights out of the forty-five in the
+          hall, and every lit pixel in the scene computes every light in
+          it, every frame. The case edges and deck glow carry the rest.
+        */
+        { x: 0.42, z: 0.42, i: 1.25, key: true },
       ].map((lamp, n) => (
         <group key={n}>
           {/* the visible fitting in the case head */}
@@ -988,179 +871,123 @@ function CasesInner({
 }
 
 /**
- * The inlay at the heart of the door.
- *
- * Drawn, not generated. The previous attempt scattered procedural traces
- * across the leaf and it read as noise, because randomness cannot make
- * something look considered — an ancient object is covered in marks that
- * a person DECIDED on, and the eye can tell the difference immediately.
- *
- * So this is an explicit list of segments, all on a coarse grid, all
- * right angles, one line weight, mirrored exactly across the seam. The
- * discipline is the point: strict symmetry and a single stroke width are
- * what make a pattern read as inscribed rather than sprayed on.
- *
- * Coordinates are fractions of the door, so the motif scales with it.
+ * The hall photograph, cropped to 4:5 with nothing lost but a strip of
+ * seat-back, and graded into the museum's palette like the About wall.
  */
-const INLAY: { x1: number; y1: number; x2: number; y2: number }[] = [
-  // the spine, running beside the seam
-  { x1: 0.035, y1: 0.3, x2: 0.035, y2: 0.63 },
+const FLIGHT_CROP: PhotoCrop = { focus: [0.5, 0.42], zoom: 1 };
 
-  // upper bracket: out, up a step, out again
-  { x1: 0.035, y1: 0.585, x2: 0.15, y2: 0.585 },
-  { x1: 0.15, y1: 0.585, x2: 0.15, y2: 0.625 },
-  { x1: 0.15, y1: 0.625, x2: 0.245, y2: 0.625 },
-
-  // the long middle arm, the widest reach of the motif
-  { x1: 0.035, y1: 0.485, x2: 0.215, y2: 0.485 },
-  { x1: 0.215, y1: 0.485, x2: 0.215, y2: 0.44 },
-  { x1: 0.215, y1: 0.44, x2: 0.305, y2: 0.44 },
-
-  // lower bracket, mirroring the upper one downward
-  { x1: 0.035, y1: 0.375, x2: 0.13, y2: 0.375 },
-  { x1: 0.13, y1: 0.375, x2: 0.13, y2: 0.335 },
-  { x1: 0.13, y1: 0.335, x2: 0.2, y2: 0.335 },
-
-  // a short return above the spine, closing the composition
-  { x1: 0.035, y1: 0.63, x2: 0.105, y2: 0.63 },
-];
-
-/** Where the runs terminate, as square nodes. */
-const INLAY_NODES: { x: number; y: number; s: number }[] = [
-  { x: 0.245, y: 0.625, s: 1 },
-  { x: 0.305, y: 0.44, s: 1.3 },
-  { x: 0.2, y: 0.335, s: 1 },
-  { x: 0.105, y: 0.63, s: 0.8 },
-];
+/** Brass, for the hardware and the inlay only. */
+const BRASS = "#c2a05a";
+/** The sandstone repeat across the arch, matched to the walls' own tiling. */
+const STONE_TILE = 1 / 6.4;
+/** Where each leaf hangs from: just inside its jamb of the arched opening. */
+const HANG = (DOOR_W + 0.14) / 2 - 0.03;
 
 /**
- * The Ancient-Futuristic Portal.
+ * A pair of arched doors in a stepped stone surround.
  *
- * Built to the brief: an elongated arch, stepped archivolts, oxidised
- * metal leaves etched with circuitry, a sigil where they meet, and light
- * escaping the seam onto worn steps.
+ * Three materials, and each kept to its job. The surround is the wall's
+ * own sandstone, so the opening reads as cut through it; the leaves are
+ * dark walnut in recessed panels; brass is the hardware and one fine
+ * inlay line, nothing more. The pattern lives in one place - a carved
+ * ajrak band round the inner arch - so it reads as detail, not noise.
  *
- * WINDING, first, because it is what broke the previous attempt. A
- * THREE.Shape whose outer contour runs clockwise is treated as a hole,
- * so it extrudes to nothing. The left leaf was wound clockwise and
- * collapsed to a sliver while the right one rendered correctly — the
- * same code, mirrored, behaving completely differently. Both leaves are
- * now built bottom-edge-first in the +x direction and closed along the
- * top in -x, which is counter-clockwise whichever side they are on.
+ * The surround steps back in three orders, each a little deeper than the
+ * one outside it, which is what gives a real portal its depth.
  *
- * The ancient-to-technological gradient the brief asks for is carried by
- * the archivolts: the outermost ring is eroded stone with no glow at all,
- * the middle ring picks up faint vein light in its recesses, and the
- * innermost ring is fully etched circuitry. Walking inward, the stone
- * "wakes up".
+ * WINDING, because it broke an earlier version: a THREE.Shape whose
+ * outer contour runs clockwise is treated as a hole and extrudes to
+ * nothing. Both leaves are built bottom-edge-first in +x and closed
+ * along the top in -x, counter-clockwise whichever side they are on.
  */
 function DoorInner({
   door,
   active,
   onEnter,
+  onPrewarm,
 }: {
   door: DoorSpec;
   active: boolean;
   onEnter: (id: RoomId) => void;
+  onPrewarm: (id: RoomId) => void;
 }) {
   const [hovered, setHovered] = useState(false);
   const lit = hovered || active;
   const sgn = door.side === "left" ? -1 : 1;
+  /* the doors are numbered down the hall, the way a gallery numbers its rooms */
+  const number = String(doors.findIndex((d) => d.id === door.id) + 1).padStart(2, "0");
 
   /*
     The leaves swing, and they wait for you.
 
-    Entering a room used to cut: the door stayed shut and the camera
-    passed straight through it. Both halves of that were wrong — you
-    never saw the door you clicked do anything, and the hall and the
-    chamber never visibly joined up.
-
-    Each leaf hangs off its own jamb, which is where the strap hinges
-    below are drawn, so the pivot is the outer edge and they part in the
-    middle the way a real pair does. They open inward, into the room.
-
-    The latch is what keeps them from slamming on the way out: once
-    opened they stay open until the camera is well clear, so you walk
-    back through an open door rather than a closing one.
+    Each leaf hangs off its own jamb, so the pivot is the outer edge and
+    they part in the middle the way a real pair does. They open inward,
+    into the room. Once opened they stay open until the camera is back in
+    the hall, so you walk out through an open door, not a closing one.
   */
   const pivots = useRef<(THREE.Group | null)[]>([null, null]);
-  const seam = useRef<THREE.MeshStandardMaterial>(null);
+  const parting = useRef<THREE.MeshBasicMaterial>(null);
+  const plaque = useRef<HTMLDivElement>(null);
   const swing = useRef(0);
   const latched = useRef(false);
-  const doorAt = useMemo(
-    () => new THREE.Vector3(doorX(door.side), CAM_Y, door.z),
-    [door.side, door.z],
-  );
 
-  useFrame(({ camera }, delta) => {
+  useFrame(({ camera }, rawDelta) => {
+    // a dropped frame pauses the swing rather than skipping it
+    const delta = Math.min(rawDelta, 1 / 15);
+
+    /*
+      The plaques belong to the hall. Drawn over the canvas, they would
+      show through the walls of a room, so they fade once you step into a
+      doorway and come back when you are out in the hall again.
+    */
+    const away = Math.abs(camera.position.x) > HW - 1.6;
+    const el = plaque.current;
+    if (el && el.classList.contains("is-away") !== away) el.classList.toggle("is-away", away);
+
     if (active) latched.current = true;
-    else if (latched.current && camera.position.distanceToSquared(doorAt) > 15 ** 2) {
-      latched.current = false;
-    }
-    // opens faster than it closes, the way a sprung door behaves
-    const rate = latched.current ? 1 / 0.5 : -1 / 0.8;
-    const next = THREE.MathUtils.clamp(swing.current + rate * delta, 0, 1);
-    if (next === swing.current) return;
-    swing.current = next;
-
-    const e = next * next * (3 - 2 * next);
+    else if (latched.current && Math.abs(camera.position.x) < HW - 0.6) latched.current = false;
+    /*
+      Slow enough to be watched opening as you turn to it, and open well
+      before the walk in CameraRig reaches the threshold, about a second
+      and a half after the click. It closes a little slower behind you.
+    */
+    const rate = latched.current ? 1 / 0.95 : -1 / 1.2;
+    swing.current = THREE.MathUtils.clamp(swing.current + rate * delta, 0, 1);
+    const t = swing.current;
+    const e = t * t * (3 - 2 * t);
     const a = e * DOOR_SWING;
     if (pivots.current[0]) pivots.current[0].rotation.y = a;
     if (pivots.current[1]) pivots.current[1].rotation.y = -a;
+
     /*
-      The glow behind the parting is a stand-in for a chamber you cannot
-      see into while the door is shut. Once it is open you can see the
-      real one, so the stand-in has to get out of the way or you walk
-      into a lit plane instead of a room.
+      The light in the parting belongs to a shut door. It comes up only
+      as the leaves meet and is gone the moment they part, so a door
+      half open - swinging to behind you - never shows a lit line down
+      each edge of the gap.
     */
-    if (seam.current) seam.current.emissiveIntensity = (lit ? 3.4 : 2) * (1 - e);
+    const shut = Math.pow(1 - e, 6);
+    if (parting.current) {
+      parting.current.opacity = (lit ? 0.95 : 0.7) * shut;
+      parting.current.visible = shut > 0.01;
+    }
   });
   const yaw = sgn > 0 ? -Math.PI / 2 : Math.PI / 2;
 
   const W = DOOR_W;
   const H = DOOR_H;
-  /*
-    Where the arch leaves the jamb. At 0.46 the sides of the leaf were
-    only 63% of full height, so each one tapered away into a fin rather
-    than reading as a door with an arched head. At 0.76 the arch occupies
-    the top quarter, which is what a real arched door does.
-  */
+  /* where the arch leaves the jamb: the arch takes the top quarter */
   const SPRING = H * 0.76;
   const RECESS = Math.max(DOOR_RECESS, 0.7);
   const LEAF_Z = -RECESS + 0.16;
   const GAP = 0.07;
+  /* the leaf slab's front face, in the leaf's own space */
+  const FACE = 0.24 + 0.035;
 
-  const rune = useMemo(() => runeCircuitFor(1.6, 2.4), []);
-  const runeBand = useMemo(() => runeCircuitFor(0.35, 3.4), []);
-  const stone = useMemo(() => claddingFor(0.9, 1.4), []);
+  const stone = useMemo(() => claddingFor(STONE_TILE, STONE_TILE), []);
+  const wood = useMemo(() => getWalnut(), []);
+  const relief = useMemo(() => getAjrakRelief(), []);
+  const engraving = useMemo(() => getBossEngraving(), []);
   const pool = useMemo(() => getContactShadow(), []);
-
-  const trace = lit ? 1.1 : 0.5;
-
-  /*
-    Blued gunmetal, not sand and not a darker brown.
-
-    The previous patina greens were still close enough in value and
-    warmth to the walls that at corridor distance the door read as part
-    of them. These are cold and near-black: a different substance, which
-    is the only thing that separates a portal from the wall it is cut
-    into. It also gives the amber channel light something to sit against
-    instead of blending into.
-  */
-  /*
-    These are far lighter than they look like they should be, and that is
-    deliberate.
-
-    At #12161d the leaf rendered at roughly 9/255 under this hall's
-    ambient — indistinguishable from black, which is why three attempts
-    at changing the door's colour appeared to change nothing. A surface
-    with no lamp on it can only show the colour its own albedo carries,
-    so the albedo has to be bright enough to survive being dimly lit.
-  */
-  const LEAF = "#3c4b60";
-  const PATINA = "#4a5d74";
-  const IRON = "#5a7089";
-  const IRON_LIT = "#94aec8";
 
   useEffect(() => {
     if (!hovered) return;
@@ -1170,53 +997,22 @@ function DoorInner({
     };
   }, [hovered]);
 
-  /** Height of the arch at a given x. */
-  const archY = useMemo(() => {
-    const hw = W / 2;
-    const ctrlY = SPRING + (H - SPRING) * 0.78;
+  /** Height of the arched opening the leaves fill, at a given x. */
+  const openingY = useMemo(() => {
+    const hw = (W + 0.14) / 2;
+    const h = H + 0.08;
+    const ctrlY = SPRING + (h - SPRING) * 0.78;
     return (x: number) => {
       const ax = Math.abs(x);
       if (ax >= hw) return SPRING;
       const t = Math.sqrt(Math.max(0, 1 - ax / hw));
-      return (1 - t) * (1 - t) * SPRING + 2 * (1 - t) * t * ctrlY + t * t * H;
+      return (1 - t) * (1 - t) * SPRING + 2 * (1 - t) * t * ctrlY + t * t * h;
     };
   }, [W, H, SPRING]);
 
-  /** The arch as an open curve, for the light strips that trace it. */
-  const archEdge = useMemo(() => {
-    const q = (t: number, p0: number, p1: number, p2: number) =>
-      (1 - t) * (1 - t) * p0 + 2 * (1 - t) * t * p1 + t * t * p2;
-    return (w: number, h: number) => {
-      const hw = w / 2;
-      const ctrlY = SPRING + (h - SPRING) * 0.78;
-      const pts: THREE.Vector3[] = [new THREE.Vector3(-hw, 0.06, 0)];
-      pts.push(new THREE.Vector3(-hw, SPRING, 0));
-      for (let i = 1; i <= 20; i += 1) {
-        const t = i / 20;
-        pts.push(new THREE.Vector3(q(t, -hw, -hw, 0), q(t, SPRING, ctrlY, h), 0));
-      }
-      for (let i = 1; i <= 20; i += 1) {
-        const t = i / 20;
-        pts.push(new THREE.Vector3(q(t, 0, hw, hw), q(t, h, ctrlY, SPRING), 0));
-      }
-      pts.push(new THREE.Vector3(hw, 0.06, 0));
-      return new THREE.CatmullRomCurve3(pts, false, "centripetal", 0);
-    };
-  }, [SPRING]);
-
-  /**
-   * An archivolt ring: an arched outline with an arched hole punched
-   * through it.
-   *
-   * This is the fix for the door that would not appear. The previous
-   * version extruded a FILLED arch and relied on BackSide rendering to
-   * make it look hollow — which meant every ring was a solid slab across
-   * the whole doorway, and the only thing visible through them was a
-   * sliver of leaf. A ring has to be a shape with a hole in it, which is
-   * what THREE.Shape.holes is for.
-   */
-  const archRing = useMemo(() => {
-    const contour = (path: THREE.Shape | THREE.Path, w: number, h: number) => {
+  /** An arched outline, as a contour on a shape or path. */
+  const contour = useMemo(
+    () => (path: THREE.Shape | THREE.Path, w: number, h: number) => {
       const hw = w / 2;
       path.moveTo(-hw, 0);
       path.lineTo(hw, 0);
@@ -1224,84 +1020,219 @@ function DoorInner({
       path.quadraticCurveTo(hw, SPRING + (h - SPRING) * 0.78, 0, h);
       path.quadraticCurveTo(-hw, SPRING + (h - SPRING) * 0.78, -hw, SPRING);
       path.closePath();
-    };
-    return (ow: number, oh: number, iw: number, ih: number) => {
-      const shape = new THREE.Shape();
-      contour(shape, ow, oh);
-      const hole = new THREE.Path();
-      contour(hole, iw, ih);
-      shape.holes.push(hole);
-      return shape;
-    };
-  }, [SPRING]);
+    },
+    [SPRING],
+  );
 
-  /**
-   * One leaf. Bottom edge always drawn left-to-right and the top closed
-   * right-to-left, so the contour is counter-clockwise on both sides.
-   */
+  /*
+    The three orders of the surround: outer at the wall's face, each one
+    in stepping back. Each ring's opening is exactly the outline of the
+    ring inside it, so every face shows in full. The outer one still
+    covers the rectangular hole cut in the wall behind it.
+  */
+  const orders = useMemo(() => {
+    const BACK = -0.56;
+    const B = 0.02;
+    const sizes = [
+      { w: W + 1.68, h: H + 0.99, front: 0.16 },
+      { w: W + 1.12, h: H + 0.66, front: 0.06 },
+      { w: W + 0.62, h: H + 0.36, front: -0.04 },
+      // the leaves' opening
+      { w: W + 0.14, h: H + 0.08, front: 0 },
+    ];
+    return sizes.slice(0, 3).map((o, i) => {
+      const shape = new THREE.Shape();
+      contour(shape, o.w, o.h);
+      const hole = new THREE.Path();
+      contour(hole, sizes[i + 1].w, sizes[i + 1].h);
+      shape.holes.push(hole);
+      return {
+        shape,
+        z: BACK + B,
+        opts: {
+          depth: o.front - BACK - B * 2,
+          bevelEnabled: true,
+          bevelThickness: B,
+          bevelSize: B,
+          bevelSegments: 2,
+          curveSegments: 24,
+        },
+      };
+    });
+  }, [W, H, contour]);
+
+  /*
+    The carved band, laid along the inner order's face as a strip whose
+    texture runs round the arch with it - the lattice follows the curve
+    the way a carver would cut it, instead of being stamped across it.
+  */
+  const band = useMemo(() => {
+    const hw = (W + 0.35) / 2;
+    const h = H + 0.185;
+    const half = 0.065;
+    const ctrlY = SPRING + (h - SPRING) * 0.78;
+    const q = (t: number, p0: number, p1: number, p2: number) =>
+      (1 - t) * (1 - t) * p0 + 2 * (1 - t) * t * p1 + t * t * p2;
+    const pts: THREE.Vector3[] = [new THREE.Vector3(-hw, 0.02, 0), new THREE.Vector3(-hw, SPRING, 0)];
+    for (let i = 1; i <= 24; i += 1) pts.push(new THREE.Vector3(q(i / 24, -hw, -hw, 0), q(i / 24, SPRING, ctrlY, h), 0));
+    for (let i = 1; i <= 24; i += 1) pts.push(new THREE.Vector3(q(i / 24, 0, hw, hw), q(i / 24, h, ctrlY, SPRING), 0));
+    pts.push(new THREE.Vector3(hw, 0.02, 0));
+    const path = new THREE.CurvePath<THREE.Vector3>();
+    for (let i = 1; i < pts.length; i += 1) path.add(new THREE.LineCurve3(pts[i - 1], pts[i]));
+    const N = 240;
+    const length = path.getLength();
+    const pos: number[] = [];
+    const uv: number[] = [];
+    const nor: number[] = [];
+    const idx: number[] = [];
+    for (let i = 0; i <= N; i += 1) {
+      const s = i / N;
+      const p = path.getPointAt(s);
+      const tan = path.getTangentAt(s);
+      const nx = -tan.y;
+      const ny = tan.x;
+      // outward is away from the opening's centre line
+      const flip = nx * p.x + ny * (p.y - SPRING * 0.5) < 0 ? -1 : 1;
+      for (const side of [-1, 1]) {
+        pos.push(p.x + side * flip * nx * half, p.y + side * flip * ny * half, 0);
+        uv.push((s * length) / 0.13, side < 0 ? 0 : 1);
+        nor.push(0, 0, 1);
+      }
+      if (i < N) {
+        const k = i * 2;
+        idx.push(k, k + 2, k + 1, k + 1, k + 2, k + 3);
+      }
+    }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
+    g.setAttribute("normal", new THREE.Float32BufferAttribute(nor, 3));
+    g.setAttribute("uv", new THREE.Float32BufferAttribute(uv, 2));
+    g.setIndex(idx);
+    return g;
+  }, [W, H, SPRING]);
+
+  /*
+    One leaf: a walnut frame - stiles and rails - with four panels let
+    into it. The bottom three are rectangles; the top one follows the
+    arch. The panels sit back from the frame's face with a chamfer round
+    their field, and a soft shadow line in the groove.
+  */
   const leaves = useMemo(() => {
-    const hw = W / 2 - 0.08;
+    const hw = HANG;
+    const STILE = 0.18;
+    // just inside the arched opening, so no light shows round the leaves' heads
+    const top = (x: number) => openingY(x) - 0.03;
     const build = (x0: number, x1: number) => {
-      const s = new THREE.Shape();
       const lo = Math.min(x0, x1);
       const hi = Math.max(x0, x1);
+      const outline = new THREE.Shape();
       const SEG = 26;
-      s.moveTo(lo, 0);
-      s.lineTo(hi, 0);
+      outline.moveTo(lo, 0);
+      outline.lineTo(hi, 0);
       for (let i = 0; i <= SEG; i += 1) {
         const x = hi - (hi - lo) * (i / SEG);
-        s.lineTo(x, archY(x) - 0.08);
+        outline.lineTo(x, top(x));
       }
-      s.closePath();
-      return s;
+      outline.closePath();
+
+      const px0 = lo + STILE;
+      const px1 = hi - STILE;
+      const rows: [number, number][] = [
+        [0.32, 1.22],
+        [1.42, 2.62],
+        [2.82, 3.82],
+      ];
+      // a panel outline, drawn on any path, grown or shrunk by `inset`
+      const panel = (p: THREE.Path, k: number, inset: number) => {
+        const a = px0 + inset;
+        const b = px1 - inset;
+        if (k < 3) {
+          const [y0, y1] = rows[k];
+          p.moveTo(a, y0 + inset);
+          p.lineTo(b, y0 + inset);
+          p.lineTo(b, y1 - inset);
+          p.lineTo(a, y1 - inset);
+          p.closePath();
+          return;
+        }
+        // the head panel, following the arch a rail's width below it
+        const y0 = 4.02 + inset;
+        p.moveTo(a, y0);
+        p.lineTo(b, y0);
+        for (let i = 0; i <= 16; i += 1) {
+          const x = b - (b - a) * (i / 16);
+          p.lineTo(x, top(x) - 0.2 - inset);
+        }
+        p.closePath();
+      };
+      for (let k = 0; k < 4; k += 1) {
+        const hole = new THREE.Path();
+        panel(hole, k, 0);
+        outline.holes.push(hole);
+      }
+      const fields = [0, 1, 2, 3].map((k) => {
+        const s = new THREE.Shape();
+        panel(s, k, 0.03);
+        return s;
+      });
+      // the shadow in each groove: the panel's edge less a thin margin
+      const grooves = [0, 1, 2, 3].map((k) => {
+        const s = new THREE.Shape();
+        panel(s, k, 0);
+        const inner = new THREE.Path();
+        panel(inner, k, 0.045);
+        s.holes.push(inner);
+        return s;
+      });
+      return { outline, fields, grooves, inlayY: (rows[2][0] + rows[2][1]) / 2, inlayW: px1 - px0 - 0.24, cx: (px0 + px1) / 2 };
     };
     return { left: build(-hw, -GAP), right: build(GAP, hw) };
-  }, [W, GAP, archY]);
+  }, [openingY]);
 
-  /*
-    Three rings, ancient on the outside and technological on the inside.
-    Only the innermost is etched; the middle carries faint vein light in
-    its recesses; the outer is plain eroded stone.
-  */
-  /*
-    The outermost order is the WALL, not the door.
-
-    It used to be dark blue-grey like the rest of the portal, so it read
-    as a shadow halo standing off the arch — the dark corners above the
-    springing. Giving it the wall's own stone and colour makes the
-    opening look like the wall thickening into an arch, which is what a
-    real portal does: the door is metal, the surround is masonry, and
-    only the inner orders belong to the door.
-  */
-  const RINGS = [
-    { grow: 0.0, z: 0.02, depth: 0.38, colour: PATINA, etch: 1, masonry: false },
-    { grow: 0.52, z: -0.2, depth: 0.34, colour: "#4a5468", etch: 0.22, masonry: false },
-    { grow: 1.08, z: -0.42, depth: 0.3, colour: SHELL.wall, etch: 0, masonry: true },
-  ];
+  const walnut = (
+    <meshStandardMaterial
+      color="#ffffff"
+      map={wood?.map ?? null}
+      normalMap={wood?.normalMap ?? null}
+      roughnessMap={wood?.roughnessMap ?? null}
+      normalScale={new THREE.Vector2(0.6, 0.6)}
+      roughness={0.6}
+      metalness={0}
+      envMapIntensity={0.7}
+    />
+  );
+  const sandstone = (
+    <meshStandardMaterial
+      color={SHELL.wall}
+      map={stone?.map ?? null}
+      normalMap={stone?.normalMap ?? null}
+      roughnessMap={stone?.roughnessMap ?? null}
+      normalScale={new THREE.Vector2(0.8, 0.8)}
+      roughness={0.9}
+      metalness={0.03}
+      envMapIntensity={0.5}
+    />
+  );
+  const brass = <meshStandardMaterial color={BRASS} roughness={0.35} metalness={1} envMapIntensity={1.2} />;
 
   return (
     <group position={[doorX(door.side), 0, door.z]} rotation={[0, yaw, 0]}>
       {/*
-        The reveal: wall thickness seen from inside the opening.
-
-        Open at both ends, which a box is not. Drawn inside-out, the far
-        face of a closed box caps the passage with a dark plane — fine
-        while the door never opened, but the moment it does you are
-        looking at that cap instead of into the chamber behind it. The
-        two end faces are therefore dropped and only the four sides of
-        the tunnel are drawn.
+        The reveal: wall thickness seen from inside the opening. Open at
+        both ends - a closed box would cap the passage with a dark plane
+        the moment the door opened.
       */}
-      <mesh position={[0, H / 2, -RECESS / 2]}>
-        <boxGeometry args={[W, H, RECESS]} />
+      <mesh position={[0, (H + 0.14) / 2, -RECESS / 2]}>
+        <boxGeometry args={[W + 0.14, H + 0.14, RECESS]} />
         {[0, 1, 2, 3, 4, 5].map((i) => {
           const end = i >= 4; // +z and -z, the two ends
           return (
             <meshStandardMaterial
               key={i}
               attach={`material-${i}`}
-              color="#0c1015"
+              color="#16110c"
               roughness={0.95}
-              metalness={0.2}
+              metalness={0.05}
               side={THREE.BackSide}
               transparent={end}
               opacity={end ? 0 : 1}
@@ -1311,353 +1242,151 @@ function DoorInner({
         })}
       </mesh>
 
-      {/* the lit chamber behind, which the parting lets through */}
-      <mesh position={[0, H * 0.45, LEAF_Z - 0.55]}>
-        <planeGeometry args={[W * 0.9, H]} />
-        <meshStandardMaterial
-          ref={seam}
-          color={GOLD.core}
-          emissive={GOLD.core}
-          emissiveIntensity={lit ? 3.4 : 2}
-          transparent
-        />
-      </mesh>
-
-      {/* ---- the two arched leaves ---- */}
-      {([-1, 1] as const).map((side) => (
-        <group
-          key={side}
-          ref={(g) => {
-            pivots.current[side < 0 ? 0 : 1] = g;
-          }}
-          position={[side * (W / 2 - 0.08), 0, LEAF_Z]}
-        >
-          {/* offset back to the door's centreline, so the leaf is drawn
-              where it always was while turning about its own jamb */}
-          <group position={[-side * (W / 2 - 0.08), 0, 0]}>
-          <mesh>
-            <extrudeGeometry
-              args={[
-                side < 0 ? leaves.left : leaves.right,
-                {
-                  depth: 0.24,
-                  bevelEnabled: true,
-                  bevelThickness: 0.035,
-                  bevelSize: 0.035,
-                  bevelSegments: 2,
-                },
-              ]}
-            />
-            <meshStandardMaterial
-              color={LEAF}
-              map={rune?.map ?? null}
-              normalMap={rune?.normalMap ?? null}
-              roughnessMap={rune?.roughnessMap ?? null}
-              emissiveMap={rune?.emissiveMap ?? null}
-              emissive={GOLD.halo}
-              /* held well under the inlay, so the drawn motif leads and
-                 the engraving stays a texture rather than a second pattern */
-              emissiveIntensity={trace * 0.34}
-              normalScale={new THREE.Vector2(1.7, 1.7)}
-              roughness={0.5}
-              metalness={0.72}
-              envMapIntensity={1.25}
-            />
-          </mesh>
-
-          {/*
-            The inlay, mirrored onto this leaf. One stroke width, right
-            angles only, and an exact mirror of the other side — the
-            symmetry is what makes it read as deliberate.
-          */}
-          <Instances limit={INLAY.length}>
-            <boxGeometry args={[1, 1, 1]} />
-            <meshStandardMaterial
-              color={GOLD.core}
-              emissive={GOLD.core}
-              emissiveIntensity={trace * 1.1}
-              roughness={0.42}
-              metalness={0.5}
-            />
-            {INLAY.map((seg, i) => {
-              const x1 = side * seg.x1 * W;
-              const x2 = side * seg.x2 * W;
-              const y1 = seg.y1 * H;
-              const y2 = seg.y2 * H;
-              const len = Math.hypot(x2 - x1, y2 - y1);
-              const horizontal = Math.abs(x2 - x1) > Math.abs(y2 - y1);
-              return (
-                <Instance
-                  key={i}
-                  position={[(x1 + x2) / 2, (y1 + y2) / 2, 0.252]}
-                  scale={horizontal ? [len, 0.032, 0.014] : [0.032, len, 0.014]}
+      {/* ---- the two leaves ---- */}
+      {([-1, 1] as const).map((side) => {
+        const leaf = side < 0 ? leaves.left : leaves.right;
+        const pullX = side * 0.27;
+        return (
+          <group
+            key={side}
+            ref={(g) => {
+              pivots.current[side < 0 ? 0 : 1] = g;
+            }}
+            position={[side * HANG, 0, LEAF_Z]}
+          >
+            {/* offset back to the door's centreline, so the leaf turns about its own jamb */}
+            <group position={[-side * HANG, 0, 0]}>
+              {/* stiles and rails */}
+              <mesh>
+                <extrudeGeometry
+                  args={[
+                    leaf.outline,
+                    { depth: 0.24, bevelEnabled: true, bevelThickness: 0.035, bevelSize: 0.012, bevelSegments: 2 },
+                  ]}
                 />
-              );
-            })}
-          </Instances>
-          <Instances limit={INLAY_NODES.length}>
-            <boxGeometry args={[1, 1, 1]} />
-            <meshStandardMaterial
-              color={GOLD.core}
-              emissive={GOLD.core}
-              emissiveIntensity={trace * 1.5}
-              roughness={0.4}
-              metalness={0.5}
-            />
-            {INLAY_NODES.map((n, i) => (
-              <Instance
-                key={`n${i}`}
-                position={[side * n.x * W, n.y * H, 0.254]}
-                scale={[0.075 * n.s, 0.075 * n.s, 0.016]}
-              />
-            ))}
-          </Instances>
+                {walnut}
+              </mesh>
 
-          {/* raised panel band, with an etched field recessed inside it */}
-          <mesh position={[side * (W * 0.23), H * 0.2, 0.26]}>
-            <boxGeometry args={[W * 0.34, H * 0.3, 0.05]} />
-            <meshStandardMaterial
-              color={IRON}
-              roughness={0.4}
-              metalness={0.88}
-              envMapIntensity={1.35}
-            />
-          </mesh>
-          <mesh position={[side * (W * 0.23), H * 0.2, 0.29]}>
-            <boxGeometry args={[W * 0.27, H * 0.24, 0.025]} />
-            <meshStandardMaterial
-              color={LEAF}
-              map={rune?.map ?? null}
-              emissiveMap={rune?.emissiveMap ?? null}
-              emissive={GOLD.halo}
-              emissiveIntensity={trace * 0.5}
-              roughness={0.48}
-              metalness={0.68}
-            />
-          </mesh>
+              {/* the panels, set back from the face, a chamfer round each field */}
+              {leaf.fields.map((field, k) => (
+                <mesh key={`f${k}`} position={[0, 0, FACE - 0.04 - 0.11]}>
+                  <extrudeGeometry
+                    args={[
+                      field,
+                      { depth: 0.1, bevelEnabled: true, bevelThickness: 0.012, bevelSize: 0.018, bevelSegments: 1 },
+                    ]}
+                  />
+                  {walnut}
+                </mesh>
+              ))}
+              {leaf.grooves.map((groove, k) => (
+                <mesh key={`g${k}`} position={[0, 0, FACE - 0.039]} renderOrder={1}>
+                  <shapeGeometry args={[groove]} />
+                  <meshBasicMaterial color="#000000" transparent opacity={0.45} depthWrite={false} />
+                </mesh>
+              ))}
 
-          {/*
-            Strap hinges reaching in from the jamb.
+              {/* a fine brass line inlaid across the upper panel */}
+              <mesh position={[leaf.cx, leaf.inlayY, FACE - 0.038]}>
+                <boxGeometry args={[leaf.inlayW, 0.012, 0.004]} />
+                {brass}
+              </mesh>
 
-            Three per leaf, and each was three meshes — eighteen draw
-            calls a door, two hundred across the hall, for the same bar,
-            tip and pin repeated. Instanced they are three, and the
-            geometry is uploaded once instead of eighteen times.
-          */}
-          <Instances limit={3}>
-            <boxGeometry args={[W * 0.38, 0.13, 0.055]} />
-            <meshStandardMaterial
-              color={IRON_LIT}
-              roughness={0.36}
-              metalness={0.94}
-              envMapIntensity={1.45}
-            />
-            {HINGE_Y.map((f) => (
-              <Instance key={f} position={[side * (W * 0.29), H * f, 0.265]} />
-            ))}
-          </Instances>
+              {/*
+                The pull: one slim brass bar beside the parting, on two
+                short posts, with a thread of cyan light down its inner
+                edge - the one modern note on the door.
+              */}
+              <group position={[pullX, 2.05, FACE]}>
+                <mesh position={[0, 0, 0.075]}>
+                  <capsuleGeometry args={[0.032, 0.64, 4, 12]} />
+                  {brass}
+                </mesh>
+                {[-0.26, 0.26].map((y) => (
+                  <mesh key={y} position={[0, y, 0.035]} rotation={[Math.PI / 2, 0, 0]}>
+                    <cylinderGeometry args={[0.014, 0.014, 0.07, 8]} />
+                    {brass}
+                  </mesh>
+                ))}
+                <mesh position={[-side * 0.033, 0, 0.075]}>
+                  <boxGeometry args={[0.006, 0.58, 0.012]} />
+                  <meshBasicMaterial color="#5ad1d6" transparent opacity={0.7} toneMapped={false} />
+                </mesh>
+              </group>
 
-          {/* the tapered tip, so a strap is not just a bar */}
-          <Instances limit={3}>
-            <coneGeometry args={[0.085, 0.24, 4]} />
-            <meshStandardMaterial color={IRON_LIT} roughness={0.36} metalness={0.94} />
-            {HINGE_Y.map((f) => (
-              <Instance
-                key={f}
-                position={[side * (W * 0.1), H * f, 0.265]}
-                rotation={[0, 0, Math.PI / 2]}
-              />
-            ))}
-          </Instances>
-
-          <Instances limit={3}>
-            <cylinderGeometry args={[0.08, 0.08, 0.22, 12]} />
-            <meshStandardMaterial color={IRON_LIT} roughness={0.34} metalness={0.95} />
-            {HINGE_Y.map((f) => (
-              <Instance
-                key={f}
-                position={[side * (W * 0.46), H * f, 0.265]}
-                rotation={[0, 0, Math.PI / 2]}
-              />
-            ))}
-          </Instances>
+              {/* half of the brass boss: the two halves meet on the parting */}
+              <mesh position={[0, 3.92, FACE + 0.022]} rotation={[Math.PI / 2, 0, 0]}>
+                <cylinderGeometry
+                  args={[0.16, 0.165, 0.044, 32, 1, false, side < 0 ? Math.PI : 0, Math.PI]}
+                />
+                <meshStandardMaterial
+                  color="#ffffff"
+                  map={engraving ?? null}
+                  roughness={0.35}
+                  metalness={1}
+                  envMapIntensity={1.2}
+                />
+              </mesh>
+              {/* and its cut face, which shows as the leaves part */}
+              <mesh position={[0, 3.92, FACE + 0.022]} rotation={[0, -side * Math.PI * 0.5, 0]}>
+                <planeGeometry args={[0.044, 0.32]} />
+                {brass}
+              </mesh>
+            </group>
           </group>
-        </group>
-      ))}
+        );
+      })}
 
       {/*
-        The rivets are gone.
-
-        Thirty-two spheres a door, so a hundred and ninety-two draw
-        calls across the hall, for beads a couple of centimetres across
-        that are never read as individual objects at any distance you
-        actually stand. They were also pinned to the door frame rather
-        than to the leaves, so once the leaves began to swing the rivets
-        stayed behind, hanging in the opening. The strap hinges and the
-        engraving carry the ironwork on their own.
+        The parting: a thin warm line where the leaves meet, held well
+        under the bloom threshold so it reads as lamplight through a crack
+        and not as a white tube. Only one line, and only while shut.
       */}
+      <mesh position={[0, (H + 0.05) / 2, LEAF_Z + 0.12]}>
+        <planeGeometry args={[GAP * 1.4, H + 0.05]} />
+        <meshBasicMaterial ref={parting} color="#d99a48" transparent opacity={lit ? 0.95 : 0.7} depthWrite={false} />
+      </mesh>
 
-      {/* ---- the hexagonal sigil, split across the parting ---- */}
-      <group position={[0, H * 0.42, LEAF_Z + 0.28]}>
-        <mesh rotation={[Math.PI / 2, 0, 0]}>
-          <cylinderGeometry args={[0.52, 0.56, 0.09, 6]} />
-          <meshStandardMaterial
-            color={IRON}
-            roughness={0.38}
-            metalness={0.92}
-            envMapIntensity={1.35}
-          />
+      {/* ---- the surround: three orders of sandstone, each stepped back ---- */}
+      {orders.map((o, i) => (
+        <mesh key={i} position={[0, 0, o.z]}>
+          <extrudeGeometry args={[o.shape, o.opts]} />
+          {sandstone}
         </mesh>
-        {/* nested hexagons, brightening inward */}
-        {[
-          { r: 0.42, w: 0.028, i: 0.7 },
-          { r: 0.3, w: 0.024, i: 1.1 },
-          { r: 0.18, w: 0.02, i: 1.7 },
-        ].map((ring) => (
-          <mesh key={ring.r} position={[0, 0, 0.06]} rotation={[0, 0, Math.PI / 6]}>
-            <torusGeometry args={[ring.r, ring.w, 6, 6]} />
-            <meshStandardMaterial
-              color={GOLD.core}
-              emissive={GOLD.core}
-              emissiveIntensity={trace * ring.i}
-              roughness={0.35}
-              metalness={0.7}
-            />
-          </mesh>
-        ))}
-        {/* the core of the sigil */}
-        <mesh position={[0, 0, 0.07]} rotation={[Math.PI / 2, 0, 0]}>
-          <cylinderGeometry args={[0.1, 0.1, 0.02, 6]} />
-          <meshStandardMaterial
-            color={GOLD.core}
-            emissive={GOLD.core}
-            emissiveIntensity={trace * 2.2}
-          />
-        </mesh>
-      </group>
+      ))}
 
-      {/* ---- the parting, and the light through it ---- */}
-      <mesh position={[0, H * 0.45, LEAF_Z + 0.22]}>
-        <planeGeometry args={[GAP * 1.4, H * 0.9]} />
+      {/* the carved ajrak band round the inner order */}
+      <mesh geometry={band} position={[0, 0, -0.04 + 0.002]}>
         <meshStandardMaterial
-          color={GOLD.core}
-          emissive={GOLD.core}
-          emissiveIntensity={lit ? 3.4 : 2.2}
-          toneMapped={false}
-        />
-      </mesh>
-      <mesh position={[0, H * 0.4, LEAF_Z + 0.26]}>
-        <planeGeometry args={[0.66, H * 0.92]} />
-        <meshBasicMaterial
-          color={GOLD.halo}
-          transparent
-          opacity={lit ? 0.26 : 0.15}
-          depthWrite={false}
-          blending={THREE.AdditiveBlending}
+          color={SHELL.wall}
+          map={relief?.map ?? null}
+          normalMap={relief?.normalMap ?? null}
+          normalScale={new THREE.Vector2(1.1, 1.1)}
+          roughness={0.9}
+          metalness={0.03}
+          envMapIntensity={0.5}
         />
       </mesh>
 
-      {/* ---- the archivolts: ancient outside, technological inside ---- */}
-      {RINGS.map((ring, i) => (
-        <mesh key={i} position={[0, 0, ring.z]}>
-          <extrudeGeometry
-            args={[
-              archRing(
-                W + 0.6 + ring.grow,
-                H + 0.34 + ring.grow * 0.6,
-                // the hole is the previous ring's outer edge, so they nest
-                W + 0.14 + ring.grow * 0.55,
-                H + 0.08 + ring.grow * 0.32,
-              ),
-              {
-                depth: ring.depth,
-                bevelEnabled: true,
-                bevelThickness: 0.05,
-                bevelSize: 0.05,
-                bevelSegments: 3,
-              },
-            ]}
-          />
-          <meshStandardMaterial
-            color={ring.colour}
-            map={ring.etch > 0.5 ? runeBand?.map ?? null : stone?.map ?? null}
-            normalMap={ring.etch > 0.5 ? runeBand?.normalMap ?? null : stone?.normalMap ?? null}
-            roughnessMap={ring.etch > 0.5 ? null : stone?.roughnessMap ?? null}
-            emissiveMap={ring.etch > 0 ? runeBand?.emissiveMap ?? null : null}
-            emissive={GOLD.halo}
-            emissiveIntensity={trace * ring.etch * 0.7}
-            normalScale={new THREE.Vector2(1.5, 1.5)}
-            /* masonry matches the wall's own finish, so it reads as wall */
-            roughness={ring.masonry ? 0.86 : 0.66 + i * 0.1}
-            metalness={ring.masonry ? 0.05 : 0.45 - i * 0.15}
-            envMapIntensity={ring.masonry ? 0.5 : 1.05}
-          />
-        </mesh>
-      ))}
-
       {/*
-        A grazing wash across the door face.
-
-        Placed well back in the corridor and aimed across rather than at
-        the door, with the penumbra almost fully open. That is what
-        avoids the hard oval a close point light produced: at this
-        distance the falloff across the face is gentle, so the material
-        is revealed without a hotspot appearing anywhere on it.
+        The plaque on the keystone: the room's number and name, set in the
+        site's own type as real text rather than drawn into the scene.
       */}
-      <PoolLight
-        position={[0, H * 1.25, 5.2]}
-        target={[0, H * 0.4, 0]}
-        intensity={lit ? 150 : 88}
-        angle={0.5}
-        distance={9}
-        color="#cfe2ff"
-      />
-
-      {/*
-        Light strips following the door's own edges.
-
-        Traced off the same arch curve the rings are built from, so they
-        sit exactly on the corner where each archivolt steps back rather
-        than floating near it. Three runs at decreasing brightness give
-        the opening depth: the innermost edge is brightest and the outer
-        ones fall away, which is how an edge-lit recess actually reads.
-      */}
-      {[
-        { grow: 0.1, z: 0.4, r: 0.03, i: 1.5 },
-        { grow: 0.62, z: 0.16, r: 0.026, i: 0.85 },
-        { grow: 1.18, z: -0.08, r: 0.022, i: 0.45 },
-      ].map((strip, i) => (
-        <mesh key={i} position={[0, 0, strip.z]}>
-          <tubeGeometry
-            args={[archEdge(W + 0.36 + strip.grow, H + 0.2 + strip.grow * 0.6), 96, strip.r, 8, false]}
-          />
-          <meshStandardMaterial
-            color={GOLD.core}
-            emissive={GOLD.core}
-            emissiveIntensity={trace * strip.i}
-            roughness={0.35}
-            metalness={0.6}
-          />
-        </mesh>
-      ))}
-
-      {/*
-        The glowing corner cubes are gone.
-
-        Four lit boxes floating at the corners of every doorway read as
-        placeholder geometry, not lighting — nothing about a cube says
-        "fitting". The edge strips already describe the opening, and they
-        follow its actual curve, which is what makes them believable.
-      */}
-
-      {/*
-        The crystal shards are gone.
-
-        Detached octahedra floating around the arch head read as debris,
-        not architecture — nothing connected them to the stone, so they
-        hung in the air like placeholder markers. If the arch wants a
-        crown it should be cut from the arch itself, not scattered near it.
-      */}
+      <Html
+        transform
+        center
+        position={[0, H + 0.82, 0.18]}
+        distanceFactor={4.4}
+        zIndexRange={[20, 0]}
+        pointerEvents="none"
+      >
+        <div ref={plaque} className={`door-plaque${lit ? " is-lit" : ""}`} aria-hidden="true">
+          <span className="door-plaque-dot" />
+          <span>
+            {number} / {door.label}
+          </span>
+        </div>
+      </Html>
 
       {/* ---- worn steps up to the threshold ---- */}
       {[
@@ -1666,26 +1395,13 @@ function DoorInner({
       ].map((st, i) => (
         <mesh key={i} position={[0, st.y, st.z]}>
           <boxGeometry args={[st.w, 0.12, st.d]} />
-          <meshStandardMaterial
-            color="#404f61"
-            map={stone?.map ?? null}
-            normalMap={stone?.normalMap ?? null}
-            roughnessMap={stone?.roughnessMap ?? null}
-            normalScale={new THREE.Vector2(1.2, 1.2)}
-            roughness={0.9}
-            metalness={0.08}
-          />
+          {sandstone}
         </mesh>
       ))}
 
       {/*
-        The pool of light on the floor, with a real falloff.
-
-        It was a plain quad before, so it drew as a hard-edged rectangle
-        sitting on the floor like a sheet of paper — light does not have
-        corners. Masking it with a radial gradient is what turns it back
-        into a pool: bright under the seam, gone by its edges, with
-        nothing to give away that it is a rectangle underneath.
+        The pool of light on the floor, with a real falloff: masked with a
+        radial gradient so it reads as light, not as a sheet on the floor.
       */}
       <mesh position={[0, 0.15, 1.3]} rotation={[-Math.PI / 2, 0, 0]}>
         <planeGeometry args={[2.8, 4.0]} />
@@ -1717,6 +1433,7 @@ function DoorInner({
         onPointerOver={(e) => {
           e.stopPropagation();
           setHovered(true);
+          onPrewarm(door.id);
         }}
         onPointerOut={() => setHovered(false)}
         onClick={(e) => {
@@ -1731,247 +1448,6 @@ function DoorInner({
   );
 }
 
-/** A run of banding along a wall: where it is centred, and how long. */
-type WallRun = { x: number; len: number };
-
-/**
- * The museum's wall, as a component rather than as one plane of stone.
- *
- * Same build as `Walls` — plinth course, bronze band capping it, the
- * cladding field above, a recessed channel with a hairline in it near
- * the head, a cove at the ceiling and a shadow gap at the floor — but
- * authored in the wall's own frame so it can be stood up at any
- * orientation. The corridor only ever needed two walls facing each
- * other; a room needs four, and building them by hand for each is how
- * the two ends of the building stop matching.
- *
- * Local frame: the face lies in XY at z = 0 looking down +Z, so +Z is
- * into the room and everything proud of the wall has a positive z.
- */
-function LayeredWall({
-  position,
-  yaw,
-  length,
-  height,
-  opening,
-}: {
-  position: [number, number, number];
-  yaw: number;
-  length: number;
-  height: number;
-  /** a doorway centred on the wall, left as a hole in the lower courses */
-  opening?: { width: number; height: number };
-}) {
-  const CHANNEL_Y = channelY(height);
-
-  /*
-    The courses below the door head break either side of the opening.
-    The channel and the cove sit well above it — the head is 6.2 and the
-    channel starts at height - 2.2 — so those carry straight through,
-    which is what keeps the line of light unbroken around the room.
-  */
-  const low: WallRun[] = opening
-    ? (() => {
-        const seg = (length - opening.width) / 2;
-        const off = opening.width / 2 + seg / 2;
-        return [
-          { x: -off, len: seg },
-          { x: off, len: seg },
-        ];
-      })()
-    : [{ x: 0, len: length }];
-
-  return (
-    <group position={position} rotation={[0, yaw, 0]}>
-      {low.map((run) => (
-        <group key={`run${run.x}`}>
-          {/* the cladding field above the plinth */}
-          <mesh position={[run.x, (height + PLINTH_H) / 2, 0]}>
-            <planeGeometry args={[run.len, height - PLINTH_H]} />
-            <CladdingMaterial
-              rx={run.len / CLAD_TILE}
-              ry={(height - PLINTH_H) / CLAD_TILE}
-            />
-          </mesh>
-
-          {/* darker plinth course, set slightly proud */}
-          <mesh position={[run.x, PLINTH_H / 2, 0.09]}>
-            <planeGeometry args={[run.len, PLINTH_H]} />
-            <meshStandardMaterial
-              color={SHELL.recess}
-              roughness={0.62}
-              metalness={0.3}
-              envMapIntensity={0.7}
-            />
-          </mesh>
-
-          {/* bronze band capping the plinth */}
-          <mesh position={[run.x, TRIM_Y, 0.1]}>
-            <boxGeometry args={[run.len, 0.09, 0.22]} />
-            <meshStandardMaterial
-              color={GOLD.metal}
-              roughness={0.3}
-              metalness={1}
-              envMapIntensity={1.5}
-            />
-          </mesh>
-
-          {/* floor corner: a shadow gap with a dim strip inside it */}
-          <mesh position={[run.x, 0.2, 0.14]}>
-            <planeGeometry args={[run.len, 0.4]} />
-            <meshStandardMaterial color={SHELL.recess} roughness={0.9} />
-          </mesh>
-          <mesh position={[run.x, 0.1, 0.22]}>
-            <boxGeometry args={[run.len, 0.09, 0.09]} />
-            <meshStandardMaterial color={MID.bronze} roughness={0.45} metalness={0.85} />
-          </mesh>
-          <mesh position={[run.x, 0.1, 0.28]}>
-            <boxGeometry args={[run.len, 0.06, 0.03]} />
-            <meshStandardMaterial
-              color="#fff4e0"
-              emissive={GOLD.core}
-              emissiveIntensity={1.3}
-              roughness={0.6}
-              transparent
-              opacity={0.94}
-            />
-          </mesh>
-        </group>
-      ))}
-
-      {/* the lintel panel over a doorway, so the wall closes above it */}
-      {opening ? (
-        <mesh position={[0, (height + opening.height) / 2, 0]}>
-          <planeGeometry args={[opening.width, height - opening.height]} />
-          <CladdingMaterial
-            rx={opening.width / CLAD_TILE}
-            ry={(height - opening.height) / CLAD_TILE}
-          />
-        </mesh>
-      ) : null}
-
-      {/* recessed channel near the head of the wall, and its hairline */}
-      <mesh position={[0, CHANNEL_Y, 0.14]}>
-        <boxGeometry args={[length, 0.34, 0.28]} />
-        <meshStandardMaterial color={SHELL.recess} roughness={0.9} />
-      </mesh>
-      <mesh position={[0, CHANNEL_Y - 0.1, 0.24]}>
-        <boxGeometry args={[length * 0.99, 0.05, 0.05]} />
-        <meshStandardMaterial
-          color={GOLD.metalLit}
-          emissive={GOLD.core}
-          emissiveIntensity={EMIT.hairline * 0.5}
-          roughness={0.3}
-          metalness={0.9}
-        />
-      </mesh>
-
-      {/* the cove at the ceiling: lip, housing, diffuser behind it */}
-      <mesh position={[0, height - 0.5, 0.22]}>
-        <boxGeometry args={[length, 0.1, 0.44]} />
-        <meshStandardMaterial
-          color={GOLD.metal}
-          roughness={0.32}
-          metalness={1}
-          envMapIntensity={1.4}
-        />
-      </mesh>
-      <mesh position={[0, height - 0.38, 0.13]}>
-        <boxGeometry args={[length, 0.1, 0.1]} />
-        <meshStandardMaterial color={MID.bronze} roughness={0.42} metalness={0.9} />
-      </mesh>
-      <mesh position={[0, height - 0.38, 0.2]}>
-        <boxGeometry args={[length, 0.07, 0.035]} />
-        <meshStandardMaterial
-          color="#fff4e0"
-          emissive={GOLD.core}
-          emissiveIntensity={1.9}
-          roughness={0.6}
-          transparent
-          opacity={0.94}
-        />
-      </mesh>
-    </group>
-  );
-}
-
-/**
- * The reveal around the doorway, seen from inside the room.
- *
- * The door leaf is recessed into the corridor wall, which means it
- * stands slightly proud on this side — so the opening needs real
- * thickness lining it or the leaf reads as a slab floating in a hole.
- * Same frame as `LayeredWall`: +Z is into the room.
- */
-function RoomPortal({
-  width,
-  height,
-  depth,
-}: {
-  width: number;
-  height: number;
-  depth: number;
-}) {
-  const JAMB = 0.18;
-  const reveal = (
-    <meshStandardMaterial color={SHELL.recess} roughness={0.72} metalness={0.25} />
-  );
-
-  return (
-    <group>
-      {/* the two jambs */}
-      {[-1, 1].map((s) => (
-        <mesh
-          key={s}
-          position={[s * (width / 2 + JAMB / 2), height / 2, depth / 2]}
-        >
-          <boxGeometry args={[JAMB, height + JAMB, depth]} />
-          {reveal}
-        </mesh>
-      ))}
-      {/* and the head over them */}
-      <mesh position={[0, height + JAMB / 2, depth / 2]}>
-        <boxGeometry args={[width + JAMB * 2, JAMB, depth]} />
-        {reveal}
-      </mesh>
-
-      {/* a bronze bead on the room-side arris, the way the plinth is capped */}
-      {[-1, 1].map((s) => (
-        <mesh key={`b${s}`} position={[s * (width / 2 + JAMB / 2), height / 2, depth]}>
-          <boxGeometry args={[0.1, height + JAMB, 0.1]} />
-          <meshStandardMaterial
-            color={GOLD.metal}
-            roughness={0.3}
-            metalness={1}
-            envMapIntensity={1.5}
-          />
-        </mesh>
-      ))}
-      <mesh position={[0, height + JAMB / 2, depth]}>
-        <boxGeometry args={[width + JAMB * 2, 0.1, 0.1]} />
-        <meshStandardMaterial
-          color={GOLD.metal}
-          roughness={0.3}
-          metalness={1}
-          envMapIntensity={1.5}
-        />
-      </mesh>
-    </group>
-  );
-}
-
-/**
- * A room off the corridor, built the way the corridor is built.
- *
- * It was three bare cladding panels, a floor, a flat ceiling colour and
- * one overhead spot — which is why it read as an alcove behind a very
- * good door. This is the same volume finished to the hall's own
- * specification: four layered walls, the pavers overhead as well as
- * underfoot, a continuous cove around all four sides, wall lamps on
- * brackets, a lined reveal back to the doorway, and the back wall
- * grazed rather than flooded so whatever stands against it keeps the
- * contrast the palette asks for.
- */
 /**
  * Holds a subtree that never moves, and stops it being recalculated.
  *
@@ -2030,201 +1506,136 @@ function useStaged(total: number, everyMs: number) {
   return built;
 }
 
-/** Where the strap hinges sit, as fractions of the door's height. */
-const HINGE_Y = [0.14, 0.38, 0.62];
-
 /** How far the leaves swing: wide enough to walk through and still be seen. */
 const DOOR_SWING = 1.28;
 
-/** Past this, a chamber is too far down the hall to be worth drawing. */
-const ROOM_VISIBLE_RANGE = 40;
-
-function RoomShellInner({ door, entered }: { door: DoorSpec; entered: boolean }) {
-  const dir = door.side === "left" ? -1 : 1;
-  const [cx, cz] = roomCenter(door);
-
-  /*
-    Built always, drawn only when you are near it.
-
-    The chambers flank the hall, so they sit inside the view cone for
-    most of the walk and the frustum will not cull them — six rooms'
-    worth of walls, floors and ceilings were being drawn behind solid
-    stone the whole way down the corridor, which is occlusion the GPU
-    cannot work out for itself.
-
-    Toggling `visible` skips the subtree entirely, so a far room costs
-    no draw calls at all, while its geometry, materials and compiled
-    shaders stay resident — which is the whole point of building them up
-    front. Done on the object rather than in React state so walking past
-    a door does not re-render anything.
-  */
-  const shell = useRef<THREE.Group>(null);
-  const here = useMemo(() => new THREE.Vector3(cx, CAM_Y, cz), [cx, cz]);
-  useFrame(({ camera }) => {
-    const g = shell.current;
-    if (!g) return;
-    /*
-      The room you have just walked into is drawn however far the camera
-      still is from it: the door is open, you are looking straight down
-      the route into it, and it has to be standing there the whole way
-      rather than appearing when you get close.
-    */
-    const show = entered || camera.position.distanceToSquared(here) < ROOM_VISIBLE_RANGE ** 2;
-    if (g.visible !== show) g.visible = show;
-  });
-  const backX = cx + dir * (ROOM_DEPTH / 2);
-  /*
-    Nudged a hair into the room. The corridor's own wall plane sits at
-    exactly this x, and although the two face opposite ways and never
-    both draw, there is no reason to ask the depth buffer to arbitrate.
-  */
-  const frontX = cx - dir * (ROOM_DEPTH / 2) + dir * 0.02;
-  const halfW = ROOM_WIDTH / 2;
-
-  const OPEN_W = DOOR_W + 1.2;
-  const OPEN_H = DOOR_H + 0.6;
-
-  /*
-    Lamps on the side walls only. The back wall is the exhibit wall and
-    gets grazing light instead — a fitting hanging over an exhibit is
-    the thing you end up looking at. Two per side is what the 20-unit
-    run takes at the corridor's own spacing.
-  */
-  /*
-    Two fittings, not four.
-
-    Entering a room used to add six spotlights and a point light per
-    exhibit — up to thirteen. Every one of those forces a full shader
-    recompile, which is the stall you feel on the click. Three lights,
-    the same number for every room, keeps the recompile small and
-    predictable.
-  */
-  const lampX = [cx - dir * (ROOM_DEPTH / 4)];
-
+/**
+ * The doors' grazing washes, all six, mounted on the very first frame.
+ *
+ * Each door used to carry its own wash light. Three bakes the scene's
+ * light count into every material's shader, so a light arriving changes
+ * the count and every material in the museum recompiles. The doors are
+ * built one per tick to spread their cost - which meant the light count
+ * changed six separate times, and the whole scene was recompiled six
+ * times over. Measured, each door's arrival compiled about twenty-three
+ * programs.
+ *
+ * Mounted together here, outside the staging, the count is settled once
+ * before anything else is drawn. The doors can then arrive at whatever
+ * pace they like: geometry and materials only, which compile once each
+ * and are shared.
+ *
+ * The geometry is unchanged: each light sits in a group carrying its
+ * door's own position and turn, so the local coordinates it was
+ * authored in still mean the same thing.
+ */
+function DoorLights({ activeRoom }: { activeRoom: RoomId | null }) {
   return (
-    <group ref={shell}>
-      {/* back wall: the one the exhibits stand against */}
-      <LayeredWall
-        position={[backX, 0, cz]}
-        yaw={-dir * Math.PI * 0.5}
-        length={ROOM_WIDTH}
-        height={ROOM_H}
-      />
-
-      {/* the two side walls */}
-      {[-1, 1].map((s) => (
-        <LayeredWall
-          key={s}
-          position={[cx, 0, cz + s * halfW]}
-          yaw={s > 0 ? Math.PI : 0}
-          length={ROOM_DEPTH}
-          height={ROOM_H}
-        />
-      ))}
-
-      {/* the wall you came through, with the doorway left open in it */}
-      <group position={[frontX, 0, cz]} rotation={[0, dir * Math.PI * 0.5, 0]}>
-        <RoomPortal width={OPEN_W} height={OPEN_H} depth={DOOR_RECESS + 0.35} />
-      </group>
-      <LayeredWall
-        position={[frontX, 0, cz]}
-        yaw={dir * Math.PI * 0.5}
-        length={ROOM_WIDTH}
-        height={ROOM_H}
-        opening={{ width: OPEN_W, height: OPEN_H }}
-      />
-
-      <RoomFloor cx={cx} cz={cz} />
-      <RoomCeiling cx={cx} cz={cz} />
-
-      {/* fittings on the side walls, facing each other across the room */}
-      {[-1, 1].map((s) =>
-        lampX.map((x) => (
-          <WallLamp
-            key={`${s}-${x}`}
-            position={[x, ROOM_H - LAMP_DROP, cz + s * (halfW - LAMP_REACH)]}
-            yaw={s > 0 ? Math.PI / 2 : -Math.PI / 2}
-            lightless
-          />
-        )),
-      )}
-
-      {/*
-        The lights that go with these fittings live in <RoomLights>,
-        which is mounted permanently. See the note there: mounting a
-        light here instead is what made entering a room stall.
-      */}
-    </group>
+    <>
+      {doors.map((door) => {
+        const sgn = door.side === "left" ? -1 : 1;
+        const yaw = sgn > 0 ? -Math.PI / 2 : Math.PI / 2;
+        const H = DOOR_H;
+        return (
+          <group key={door.id} position={[doorX(door.side), 0, door.z]} rotation={[0, yaw, 0]}>
+            <PoolLight
+              position={[0, H * 1.25, 5.2]}
+              target={[0, H * 0.4, 0]}
+              intensity={activeRoom === door.id ? 150 : 88}
+              angle={0.5}
+              distance={9}
+              /* near-neutral, warm of white, so walnut reads as walnut and sandstone as stone */
+              color="#fff0dc"
+            />
+          </group>
+        );
+      })}
+    </>
   );
 }
 
 /**
  * The room lights, mounted permanently.
  *
- * This is the fix for the stall on clicking a door. Three bakes the
- * scene's light count into every material's shader, so adding even one
- * light forces EVERY material to recompile — which is what froze the
- * view mid-transition. These three exist from the first frame and are
- * merely moved and faded when a room is entered, so the count never
- * changes and nothing is ever recompiled.
+ * Three bakes the scene's light count into every material's shader, so
+ * adding even one light forces EVERY material to recompile - which is
+ * what used to freeze the view on clicking a door. These exist from the
+ * first frame and are only moved, re-aimed and faded when a room is
+ * entered, so the count never changes and nothing is ever recompiled.
  *
- * Parked below the floor at zero intensity when no room is open, where
- * they light nothing.
+ * A fixed pool: one narrow spotlight per exhibit (the room's plan, from
+ * roomLayout, says where each hangs in the ceiling slot and what it is
+ * aimed at), and a soft wash grazing the back wall. A room with fewer
+ * exhibits than spotlights parks the spares below the floor at zero.
+ * Narrow cones with a soft penumbra are what put pools of light on the
+ * floor and the wall rather than flooding the room evenly.
  */
 function RoomLights({ door }: { door: DoorSpec | undefined }) {
-  const keyRef = useRef<THREE.SpotLight>(null);
-  const fillRef = useRef<THREE.SpotLight>(null);
+  const plan = useMemo(() => (door ? spotPlan(door) : []), [door]);
+  const spots = useRef<(THREE.SpotLight | null)[]>([]);
+  const aims = useRef<(THREE.Object3D | null)[]>([]);
   const washRef = useRef<THREE.SpotLight>(null);
-  const targetRef = useRef<THREE.Object3D>(null);
+  const washAim = useRef<THREE.Object3D>(null);
 
   useEffect(() => {
-    const t = targetRef.current;
-    if (!t) return;
-    for (const r of [keyRef, fillRef, washRef]) {
-      if (r.current) r.current.target = t;
-    }
-    t.updateMatrixWorld();
+    spots.current.forEach((l, i) => {
+      const t = aims.current[i];
+      if (l && t) l.target = t;
+    });
+    if (washRef.current && washAim.current) washRef.current.target = washAim.current;
   }, []);
 
   const on = Boolean(door);
   const [cx, cz] = door ? roomCenter(door) : [0, 0];
   const dir = door?.side === "left" ? -1 : 1;
-  const y = on ? ROOM_H - LAMP_DROP : -40;
+  const parked: [number, number, number] = [0, -40, 0];
 
   return (
     <>
-      <spotLight
-        ref={keyRef}
-        position={[cx - dir * (ROOM_DEPTH / 4), y, cz - (ROOM_WIDTH / 2 - LAMP_REACH)]}
-        angle={1.15}
-        penumbra={0.95}
-        intensity={on ? 190 : 0}
-        color={GOLD.light}
-        distance={18}
-        decay={2}
-      />
-      <spotLight
-        ref={fillRef}
-        position={[cx - dir * (ROOM_DEPTH / 4), y, cz + (ROOM_WIDTH / 2 - LAMP_REACH)]}
-        angle={1.15}
-        penumbra={0.95}
-        intensity={on ? 190 : 0}
-        color={GOLD.light}
-        distance={18}
-        decay={2}
-      />
-      {/* grazes the back wall the exhibits stand against */}
+      {Array.from({ length: SPOT_COUNT }, (_, i) => {
+        const spot = plan[i];
+        return (
+          <group key={i}>
+            <spotLight
+              ref={(l) => {
+                spots.current[i] = l;
+              }}
+              position={spot ? spot.from : parked}
+              angle={spot?.angle ?? 0.3}
+              penumbra={0.78}
+              intensity={spot ? spot.intensity : 0}
+              color={GOLD.light}
+              distance={26}
+              decay={2}
+            />
+            <object3D
+              ref={(o) => {
+                aims.current[i] = o;
+              }}
+              position={spot ? spot.to : [0, -44, 0]}
+            />
+          </group>
+        );
+      })}
+      {/* grazes the back wall the exhibits stand against, softly, so the pools still read */}
       <spotLight
         ref={washRef}
-        position={[cx + dir * (ROOM_DEPTH / 2 - 1.4), on ? ROOM_H - 1 : -40, cz]}
+        position={[cx + dir * ((door ? roomSize(door).depth : 0) / 2 - 1.4), on ? ROOM_H - 1 : -40, cz]}
         angle={0.9}
-        penumbra={0.9}
-        intensity={on ? 240 : 0}
+        penumbra={0.95}
+        /* in the Art room the track wash lights the wall, so this only softens it */
+        intensity={on ? (door?.id === "art" ? 50 : 110) : 0}
         color={GOLD.light}
         distance={16}
         decay={2}
       />
-      <object3D ref={targetRef} position={[cx, on ? 1.4 : -44, cz]} />
+      <object3D ref={washAim} position={[cx, on ? 1.4 : -44, cz]} />
+      {/*
+        A faint cool fill in the Art room, so the shadows keep a little
+        blue against the warm light. Ambient light is not counted in the
+        shader cache, so this never recompiles anything.
+      */}
+      <ambientLight color="#334455" intensity={door?.id === "art" ? 0.05 : 0} />
     </>
   );
 }
@@ -2245,43 +1656,65 @@ function RoomLights({ door }: { door: DoorSpec | undefined }) {
   only the one you opened is rebuilt.
 */
 const Door = memo(DoorInner);
-const RoomShell = memo(RoomShellInner);
 const Cases = memo(CasesInner);
 
 const Walls = memo(WallsInner);
 const Floor = memo(FloorInner);
-const Ceiling = memo(CeilingInner);
 const FarFocus = memo(FarFocusInner);
 
 export function Corridor({
   built,
   activeRoom,
+  lightsRoom,
+  onPrewarm,
   onEnter,
   activeId,
   onSelect,
 }: {
   built: RoomId[];
   activeRoom: RoomId | null;
+  /** The room whose lights are up: the one entered, until you are back in the hall. */
+  lightsRoom: RoomId | null;
+  /** Your pointer is on a door: raise the room behind it. */
+  onPrewarm: (id: RoomId) => void;
   onEnter: (id: RoomId) => void;
   activeId: string | null;
   onSelect: (exhibit: ExhibitDatum) => void;
 }) {
-  const entered = doors.find((d) => d.id === activeRoom);
+  const lit = doors.find((d) => d.id === lightsRoom);
   // the doors themselves are part of the hall, so they all arrive — one per tick
   const step = useStaged(doors.length, 90);
   return (
     <>
       <Static>
         <Walls />
-        <Atrium />
         <Floor />
-        <Ceiling />
+        <Vault />
         <FarFocus />
         <WallInscriptions />
-        <WallArt />
       </Static>
       <Cases activeId={activeId} onSelect={onSelect} />
-      <RoomLights door={entered} />
+      {/*
+        The one picture hung in the hall: on the right-hand wall before the
+        first door, where the walk starts. The placeholder paintings that
+        used to hang along the hall are gone.
+      */}
+      <HungPicture
+        position={[HW - 0.3, 3.9, -16]}
+        rotation={[0, -Math.PI / 2, 0]}
+        exhibit={hallExhibits[0]}
+        active={activeId === hallExhibits[0].id}
+        onSelect={() => onSelect(hallExhibits[0])}
+        src="/museum/corridor-flight.jpg"
+        crop={FLIGHT_CROP}
+        /* a bright cabin graded down reads as murk; held higher than the About wall's prints */
+        tone="#d4d4d4"
+        fallback={null}
+        size={[2.1, 2.7]}
+      />
+      <RoomLights door={lit} />
+      <DoorLights activeRoom={activeRoom} />
+      <StatueLight />
       {/*
         Every chamber is built, always.
 
@@ -2312,10 +1745,16 @@ export function Corridor({
       {doors
         .filter((door) => built.includes(door.id))
         .map((door) => (
-          <RoomShell key={door.id} door={door} entered={activeRoom === door.id} />
+          <RoomShell key={door.id} door={door} entered={lightsRoom === door.id} />
         ))}
       {doors.slice(0, step).map((door) => (
-        <Door key={door.id} door={door} active={activeRoom === door.id} onEnter={onEnter} />
+        <Door
+          key={door.id}
+          door={door}
+          active={activeRoom === door.id}
+          onEnter={onEnter}
+          onPrewarm={onPrewarm}
+        />
       ))}
     </>
   );

@@ -1,6 +1,6 @@
 "use client";
 
-import { memo, Suspense, useMemo, useRef } from "react";
+import { memo, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode, RefObject } from "react";
 import { Canvas, useFrame } from "@react-three/fiber";
 import * as THREE from "three";
@@ -13,20 +13,22 @@ import { EnvLight } from "./EnvLight";
 import { ATMOSPHERE } from "./palette";
 
 import { Vitrine, type VitrineShape } from "./Vitrine";
-import { PortraitWall } from "./PortraitWall";
+import { PortraitWall, ArtWall } from "./PortraitWall";
+import { ROOM_ICON_FOR } from "./roomIcons";
 import { PerfHud } from "./PerfHud";
+import { hasDebugFlag } from "./debug";
+import { consumedDrag } from "./lookControls";
+import { compileProgress } from "./loadProgress";
 import {
+  CAM_FOV,
   CAM_Z_START,
   CAM_Y,
   doors,
-  doorX,
-  DOOR_H,
-  ROOM_DEPTH,
-  ROOM_WIDTH,
   roomCenter,
   type RoomId,
 } from "./corridorLayout";
 import { exhibitsByRoom, type ExhibitDatum } from "./exhibitData";
+import { CASE_SCALE, caseSlots } from "./roomLayout";
 
 const SHAPES: VitrineShape[] = ["icosahedron", "octahedron", "torus", "sphere", "box"];
 
@@ -61,7 +63,16 @@ const WARM_BATCH = 3;
  * flight at a time; the next starts when it resolves, so the queue
  * drains as fast as the driver allows and never faster.
  */
-function WarmShaders({ settled, done }: { settled: boolean; done: () => void }) {
+function WarmShaders({
+  settled,
+  done,
+  rescan,
+}: {
+  settled: boolean;
+  done: () => void;
+  /** Changes whenever rooms are built or pulled down: look for new materials again. */
+  rescan: string;
+}) {
   const seen = useRef<WeakSet<THREE.Material>>(new WeakSet());
   const queue = useRef<THREE.Mesh[]>([]);
   const busy = useRef(false);
@@ -69,6 +80,17 @@ function WarmShaders({ settled, done }: { settled: boolean; done: () => void }) 
   const finished = useRef(false);
   /** Frames to wait before looking for newly-built rooms again. */
   const scan = useRef(0);
+
+  /*
+    A room built after the hall has its programs compiled the same way,
+    off the main thread, in the moments before you walk into it - rather
+    than by the frame that first draws it, mid-step through the door.
+  */
+  useEffect(() => {
+    finished.current = false;
+    quiet.current = 0;
+    scan.current = 0;
+  }, [rescan]);
 
   useFrame(({ gl, scene, camera }) => {
     /*
@@ -100,6 +122,7 @@ function WarmShaders({ settled, done }: { settled: boolean; done: () => void }) 
           if (seen.current.has(m)) continue;
           seen.current.add(m);
           queue.current.push(mesh);
+          compileProgress.queued(1);
           break;
         }
       });
@@ -122,6 +145,7 @@ function WarmShaders({ settled, done }: { settled: boolean; done: () => void }) 
     busy.current = true;
     const release = () => {
       busy.current = false;
+      compileProgress.compiled(batch.length);
     };
 
     /*
@@ -188,42 +212,48 @@ function RoomContentsInner({
     );
   }
 
-  const sgn = door.side === "left" ? -1 : 1;
-  const [cx, cz] = roomCenter(door);
   /*
-    Set well out from the back wall, for two reasons.
+    Art hangs, it does not go in a case.
 
-    A case pressed against the stone sits in its own shadow, and the
-    wall wash that lights the room passes behind it instead of around
-    it. And in a room this deep, anything on the back wall is sixteen
-    units from where the visitor stands — cases at that distance read as
-    models on a shelf. Standing them a third of the way into the room
-    puts them at a viewing distance instead, and leaves the lit wall
-    behind them as a backdrop.
+    A single vitrine with an abstract solid in it said nothing about
+    visual work, and a glass box is the wrong object for something flat
+    anyway. These are the same frames as the About wall with no
+    photographs behind them yet, so the mounts read as work waiting to
+    be hung rather than as a mistake. No bench: this room is a wall to
+    walk along, not one to sit in front of.
   */
-  const backX = cx + sgn * (ROOM_DEPTH / 2 - 5.5);
+  if (roomId === "art") {
+    return <ArtWall door={door} items={items} activeId={activeId} onSelect={onSelect} />;
+  }
+
+  const sgn = door.side === "left" ? -1 : 1;
+  /*
+    Set against the back wall, not stranded in the middle of the room,
+    fanned along it at one pitch. The positions come from roomLayout, so
+    the spotlights over the cases and the camera framing them agree with
+    where they actually stand.
+  */
+  const slots = caseSlots(door, items.length);
 
   return (
     <group>
       {items.map((exhibit, i) => {
-        /*
-          Fanned along the back wall at a fixed pitch rather than spread
-          to fill it. Dividing the full width by however many exhibits a
-          room happens to hold put three cases 8 units apart and six of
-          them almost touching; a gallery sets everything out at one
-          spacing and lets a short run finish early.
-        */
-        const PITCH = 4.2;
-        const span = Math.min((items.length - 1) * PITCH, ROOM_WIDTH - 6);
-        const spread =
-          items.length === 1 ? 0 : (i / (items.length - 1) - 0.5) * span;
-        const p: [number, number, number] = [backX, 0, cz + spread];
+        const p = slots[i];
         const isActive = activeId === exhibit.id;
         return (
-          <group key={exhibit.id}>
+          /* the case and its label, scaled together about the foot of the plinth */
+          <group key={exhibit.id} position={p} scale={CASE_SCALE}>
             <Vitrine
-              position={p}
-              shape={roomId === "projects" ? "screen" : SHAPES[i % SHAPES.length]}
+              position={[0, 0, 0]}
+              shape={
+                roomId === "projects"
+                  ? "screen"
+                  : ROOM_ICON_FOR[exhibit.id]
+                    ? "icon"
+                    : SHAPES[i % SHAPES.length]
+              }
+              icon={ROOM_ICON_FOR[exhibit.id]}
+              faceYaw={-sgn * Math.PI * 0.5}
               seed={i}
               active={isActive}
               onSelect={() => onSelect(exhibit)}
@@ -234,27 +264,26 @@ function RoomContentsInner({
                   : undefined
               }
             />
-            {/* title faces back toward the doorway you came in through */}
-            <group position={[p[0], 2.5, p[2]]} rotation={[0, -sgn * Math.PI * 0.5, 0]}>
-              {/* sized for the longer sightline this room now has */}
+            {/*
+              The label goes on the front of the plinth, where a museum
+              puts it.
+
+              It used to sit at case height, which is inside the glass -
+              so the title was read through a tinted pane against the
+              dark interior and came out grey and illegible, whatever
+              colour it actually was. On the face of the plinth it is
+              lit by the room, unobstructed, and at the height you drop
+              your eyes to after looking at the piece.
+            */}
+            <group position={[-sgn * 1.085, 0.86, 0]} rotation={[0, -sgn * Math.PI * 0.5, 0]}>
               <ExhibitText
                 text={exhibit.title}
                 position={[0, 0, 0]}
-                height={0.34}
+                height={0.26}
                 active={isActive}
                 onSelect={() => onSelect(exhibit)}
               />
             </group>
-            {/*
-              No light per exhibit.
-
-              Three recompiles every material in the scene whenever the
-              light count changes, so a room that added one light per
-              exhibit froze the whole view on entry — and the About room,
-              with seven, froze it longest. The room's own fittings light
-              the pieces instead, and the count no longer depends on how
-              much is in the room.
-            */}
           </group>
         );
       })}
@@ -273,6 +302,7 @@ export function MuseumCanvas({
   onEnterRoom,
   activeId,
   onSelect,
+  onMissed,
 }: {
   progressRef: RefObject<number>;
   roomId: RoomId | null;
@@ -281,16 +311,49 @@ export function MuseumCanvas({
   onEnterRoom: (id: RoomId) => void;
   activeId: string | null;
   onSelect: (exhibit: ExhibitDatum) => void;
+  /** A click on the scene that hit nothing you can click. */
+  onMissed?: () => void;
 }) {
   /*
-    Rooms are separate again.
+    Which rooms are standing.
 
     Building all six at load is what made the loading screen hang: 770
-    geometries and 70 procedural textures in one commit. Only the room
-    you are actually in is built now, which is how this worked before
-    and is by far the cheapest thing to open with.
+    geometries and 70 procedural textures in one commit. So a room is
+    raised when you show interest in it - your pointer comes onto its
+    door - and is standing, built and compiled, by the time you click.
+    It stays up after you leave, so the walk back out goes through a
+    room rather than a void, and the next visit is free. The three most
+    recent are kept; older ones are pulled down.
   */
-  const live = roomId ? [roomId] : [];
+  const [built, setBuilt] = useState<RoomId[]>([]);
+  const keep = useCallback((id: RoomId) => {
+    setBuilt((list) => (list[0] === id ? list : [id, ...list.filter((r) => r !== id)].slice(0, 3)));
+  }, []);
+
+  /*
+    The room whose lights are on, and the room the camera has finished
+    walking into. Both trail the click: the lights stay up while you walk
+    back out and only go down once you are in the hall, and the room's
+    lens settles only once you have stopped.
+  */
+  const [lightsFor, setLightsFor] = useState<RoomId | null>(null);
+  const [arrived, setArrived] = useState<RoomId | null>(null);
+  const [seenRoom, setSeenRoom] = useState<RoomId | null>(null);
+  if (roomId !== seenRoom) {
+    setSeenRoom(roomId);
+    setArrived(null);
+    if (roomId) {
+      setLightsFor(roomId);
+      setBuilt((list) => (list[0] === roomId ? list : [roomId, ...list.filter((r) => r !== roomId)].slice(0, 3)));
+    }
+  }
+  const handleArrive = useCallback((room: RoomId | null) => {
+    setArrived(room);
+    if (!room) setLightsFor(null);
+  }, []);
+
+  /* this component only ever renders in the browser (it is loaded with ssr: false), so the address is there to read */
+  const debug = useMemo(() => hasDebugFlag(), []);
 
   /*
     The veil comes down when the museum is actually ready to be looked
@@ -330,15 +393,19 @@ export function MuseumCanvas({
         is 130 units end to end, and a depth range six times longer than
         the scene throws away depth precision for free.
       */
-      camera={{ position: [0, CAM_Y, CAM_Z_START], fov: 50, near: 0.5, far: 220 }}
+      camera={{ position: [0, CAM_Y, CAM_Z_START], fov: CAM_FOV, near: 0.5, far: 220 }}
       /*
         Capped at 1.5. Every effect in the stack is full-screen, so the
         cost of this scales with the square of the ratio: 1.75 is 36%
         more pixels than 1.5 for a difference you cannot see on a
         high-density display.
       */
-      dpr={[1, 1.5]}
+      dpr={[1, 2]}
       gl={{ antialias: true, powerPreference: "high-performance" }}
+      /* a click on bare wall or floor puts the open card away; the end of a drag to look round does not */
+      onPointerMissed={(e) => {
+        if (e.type === "click" && !consumedDrag()) onMissed?.();
+      }}
       onCreated={({ gl }) => {
         gl.toneMapping = THREE.ACESFilmicToneMapping;
         gl.toneMappingExposure = ATMOSPHERE.exposure;
@@ -353,40 +420,16 @@ export function MuseumCanvas({
 
       <Suspense fallback={null}>
         <Corridor
-          built={live}
+          built={built}
           activeRoom={roomId}
+          lightsRoom={lightsFor}
+          onPrewarm={keep}
           onEnter={onEnterRoom}
           activeId={activeId}
           onSelect={onSelect}
         />
 
-        {/*
-          The room name sits above the arch, not on the leaf.
-
-          The leaf carries dense engraving now, and a label laid over it
-          competed with the traces for every pixel. Above the apex it has
-          clear stone behind it and reads at a glance from down the hall,
-          which is what a wayfinding label is for.
-        */}
-        {doors.map((door) => {
-          const sgn = door.side === "left" ? -1 : 1;
-          const yaw = sgn > 0 ? -Math.PI / 2 : Math.PI / 2;
-          return (
-            <group
-              key={door.id}
-              position={[doorX(door.side) - sgn * 0.42, DOOR_H + 1.05, door.z]}
-              rotation={[0, yaw, 0]}
-            >
-              <ExhibitText
-                text={door.label}
-                position={[0, 0, 0]}
-                height={0.42}
-                active={roomId === door.id}
-                onSelect={() => onEnterRoom(door.id)}
-              />
-            </group>
-          );
-        })}
+        {/* each room's name is on its door's keystone plaque (see Door in Corridor) */}
 
         {/*
           Every room is furnished from the start, and drawn only when
@@ -401,7 +444,7 @@ export function MuseumCanvas({
           are already compiled, already uploaded, and entering a room
           costs a camera move and a visibility flag.
         */}
-        {live.map((id) => doors.find((d) => d.id === id)).map((d) =>
+        {built.map((id) => doors.find((d) => d.id === id)).map((d) =>
           !d ? null : (
           <NearbyOnly key={d.id} at={roomCenter(d)}>
             <RoomContents roomId={d.id} activeId={activeId} onSelect={onSelect} />
@@ -409,12 +452,12 @@ export function MuseumCanvas({
           ),
         )}
 
-        <WarmShaders settled done={announce} />
+        <WarmShaders settled done={announce} rescan={built.join(",")} />
 
       </Suspense>
 
       {/*
-        Frame timing on screen, in development only. The browser pane
+        Frame timing on screen, only with ?debug on the address. The browser pane
         used to check this project does not paint unless its window is
         in front, so the numbers cannot be read from outside — this puts
         them where whoever is looking at it can see them.
@@ -423,10 +466,10 @@ export function MuseumCanvas({
         exist until every asset had loaded, and loading is exactly the
         stretch worth watching.
       */}
-      {process.env.NODE_ENV === "production" ? null : <PerfHud />}
+      {debug ? <PerfHud /> : null}
 
-      <CameraRig progressRef={progressRef} roomId={roomId} />
-      <Effects />
+      <CameraRig progressRef={progressRef} roomId={roomId} onArrive={handleArrive} />
+      <Effects roomId={arrived} />
     </Canvas>
   );
 }

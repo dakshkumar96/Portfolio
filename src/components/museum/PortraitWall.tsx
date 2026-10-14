@@ -1,21 +1,76 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import * as THREE from "three";
 import { ExhibitText } from "./ExhibitText";
-import { ROOM_DEPTH, roomCenter, type DoorSpec } from "./corridorLayout";
+import { roomCenter, type DoorSpec } from "./corridorLayout";
+import { ART_ROWS, ART_SIZE, THUMB_SIZE, artSlots, portraitSlots, thumbSlots } from "./roomLayout";
 import type { ExhibitDatum } from "./exhibitData";
 import { consumedDrag } from "./lookControls";
-import { GOLD, MID, EMIT } from "./palette";
+import { GOLD, MID } from "./palette";
+import { exactPrint, gradedPhoto, type PhotoCrop } from "./photoGrade";
+import { getGilt, giltMoulding, ROSETTE } from "./giltFrame";
+
+/* Drawn once and shared by every frame. */
+let wallShadowTex: THREE.Texture | null = null;
+
+/** The soft shadow a frame casts on the wall: a blurred rectangle, darkest under the frame. */
+function wallShadowTexture() {
+  if (wallShadowTex) return wallShadowTex;
+  const S = 128;
+  const c = document.createElement("canvas");
+  c.width = c.height = S;
+  const ctx = c.getContext("2d");
+  if (!ctx) return null;
+  ctx.filter = "blur(9px)";
+  ctx.fillStyle = "rgba(0,0,0,0.85)";
+  ctx.fillRect(S * 0.18, S * 0.18, S * 0.64, S * 0.64);
+  wallShadowTex = new THREE.CanvasTexture(c);
+  return wallShadowTex;
+}
 
 /**
- * Photographs to hang in the About room.
- *
- * Drop files into `public/museum/` with these names and they appear
- * automatically; until then each frame shows a neutral mount, so the room
- * is never broken by a missing file.
+ * A photograph for the About wall. Shown whole and in its own colours;
+ * give it a `crop` to have it cropped and graded instead (see photoGrade).
  */
-const PHOTO_FILES = ["/museum/portrait-1.jpg", "/museum/portrait-2.jpg", "/museum/portrait-3.jpg"];
+type PhotoSpec = { src: string; crop?: PhotoCrop };
+
+/**
+ * Photographs to hang in the About room, in frame order.
+ *
+ * Each is cropped to the frame's 4:5 around its focus and graded into the
+ * museum's palette (see photoGrade). Until a file exists its frame shows
+ * a neutral mount, so the room is never broken by a missing picture.
+ */
+const PHOTO_FILES: PhotoSpec[] = [
+  // London Tech Week: face, chest up
+  { src: "/museum/portrait-1.jpg", crop: { focus: [0.48, 0.25], zoom: 1.8 } },
+  // Canary Wharf: already a close selfie, so not as far in, or it is only a face
+  { src: "/museum/portrait-2.jpg", crop: { focus: [0.47, 0.5], zoom: 1.35 } },
+  // the laptop and the notebook, at the café
+  { src: "/museum/portrait-3.jpg", crop: { focus: [0.47, 0.74], zoom: 1.2 } },
+];
+
+/*
+  The prints are made while the visitor is still in the hall, in idle
+  time, so they are on the wall the moment the About door opens.
+*/
+if (typeof window !== "undefined") {
+  const make = () =>
+    PHOTO_FILES.forEach((p) => (p.crop ? gradedPhoto(p.src, p.crop) : exactPrint(p.src)).catch(() => {}));
+  if ("requestIdleCallback" in window) window.requestIdleCallback(make, { timeout: 10000 });
+  else setTimeout(make, 5000);
+}
+
+/** A rectangle traced onto `path` from corner (x0, y0) round to (x1, y1). Three sorts out the winding. */
+function rect<P extends THREE.Path>(path: P, x0: number, y0: number, x1: number, y1: number) {
+  path.moveTo(x0, y0);
+  path.lineTo(x1, y0);
+  path.lineTo(x1, y1);
+  path.lineTo(x0, y1);
+  path.lineTo(x0, y0);
+  return path;
+}
 
 /** Plain mount used when a photograph has not been added yet. */
 function useMountTexture() {
@@ -45,7 +100,140 @@ function useMountTexture() {
   }, []);
 }
 
-function Frame({
+/**
+ * The cream mat inside an About frame: the print set back behind the
+ * mat's window, and the white core of the mat's bevelled cut showing as a
+ * fine line round it. The window is 4:5, even at the sides, with a little
+ * more mat at the foot than the head, as a framer weights it.
+ */
+function MattedPicture({
+  W,
+  H,
+  photo,
+  fallback,
+}: {
+  W: number;
+  H: number;
+  photo: THREE.Texture | null;
+  fallback: THREE.Texture | null;
+}) {
+  const MAT = 0.2;
+  const pw = W - MAT * 2;
+  const ph = Math.min(pw * 1.25, H - MAT * 2);
+  const lift = Math.min(0.03, (H - ph) / 2 - 0.05);
+
+  const shapes = useMemo(() => {
+    const win = [-pw / 2, lift - ph / 2, pw / 2, lift + ph / 2] as const;
+    const mat = rect(new THREE.Shape(), -W / 2, -H / 2, W / 2, H / 2);
+    mat.holes.push(rect(new THREE.Path(), win[0], win[3], win[2], win[1]));
+    const B = 0.016;
+    const bevel = rect(new THREE.Shape(), win[0] - B, win[1] - B, win[2] + B, win[3] + B);
+    bevel.holes.push(rect(new THREE.Path(), win[0], win[3], win[2], win[1]));
+    return { mat, bevel };
+  }, [W, H, pw, ph, lift]);
+
+  return (
+    <>
+      {/*
+        The mat's own colour is a pale blue-grey. The spot over each frame
+        is warm, and under it that reads as cream - where a true cream came
+        out camel.
+      */}
+      <mesh position={[0, 0, PICTURE_Z]}>
+        <shapeGeometry args={[shapes.mat]} />
+        <meshStandardMaterial color="#d2dff5" roughness={0.95} metalness={0} />
+      </mesh>
+      <mesh position={[0, 0, PICTURE_Z + 0.001]}>
+        <shapeGeometry args={[shapes.bevel]} />
+        <meshStandardMaterial color="#e6eefa" roughness={0.9} metalness={0} />
+      </mesh>
+      <mesh position={[0, lift, PICTURE_Z - 0.008]}>
+        <planeGeometry args={[pw, ph]} />
+        {/*
+          The print itself takes no light from the room. Lit, the spot above
+          it came off its surface as a sheen straight back at the visitor
+          below - the glare every gallery fights - and lifted its blacks to
+          grey. Matte and unlit, it shows the print as graded; the grade's
+          own vignette gives it the fall-off the light would have.
+        */}
+        {photo ? (
+          <meshBasicMaterial map={photo} color={GRADED_TONE} />
+        ) : (
+          <meshStandardMaterial map={fallback ?? undefined} roughness={0.82} metalness={0} />
+        )}
+      </mesh>
+    </>
+  );
+}
+
+/**
+ * How bright a graded print is drawn. A print graded into the museum's
+ * palette is held a little below full, as a photograph under gallery light
+ * reads, rather than glowing like a screen.
+ */
+const GRADED_TONE = "#9e9e9e";
+
+/** The picture's plane, and the mat's, in front of the frame's back. */
+const PICTURE_Z = 0.03;
+
+/**
+ * A carved and gilded frame, mitred at the corners, with a rosette carved
+ * at each - the frame every museum hangs its pictures in. Built round the
+ * picture, so it always fits the picture exactly.
+ */
+function GiltFrame({ w, h, width }: { w: number; h: number; width: number }) {
+  const gilt = useMemo(() => getGilt(), []);
+  const geometry = useMemo(() => giltMoulding(w, h, width, FRAME_DEPTH), [w, h, width]);
+  useEffect(() => () => geometry.dispose(), [geometry]);
+  const outerW = w + width * 2;
+  const outerH = h + width * 2;
+  const corner = (sx: number, sy: number): [number, number, number] => [
+    sx * (outerW / 2 - ROSETTE.inset * width),
+    sy * (outerH / 2 - ROSETTE.inset * width),
+    ROSETTE.z * width * FRAME_DEPTH,
+  ];
+  const leaf = (
+    <meshStandardMaterial
+      color="#ffffff"
+      map={gilt?.map ?? null}
+      normalMap={gilt?.normalMap ?? null}
+      normalScale={new THREE.Vector2(0.9, 0.9)}
+      roughness={0.36}
+      metalness={1}
+      envMapIntensity={1.1}
+    />
+  );
+  return (
+    <group position={[0, 0, PICTURE_Z - 0.006]}>
+      <mesh geometry={geometry}>{leaf}</mesh>
+      {/* the frame's depth behind its face, so it is a solid thing from the side - kept behind the print */}
+      <mesh position={[0, 0, -0.05]}>
+        <boxGeometry args={[outerW - 0.01, outerH - 0.01, 0.08]} />
+        <meshStandardMaterial color="#3d2a14" roughness={0.6} metalness={0.4} />
+      </mesh>
+      {[
+        [-1, -1],
+        [1, -1],
+        [1, 1],
+        [-1, 1],
+      ].map(([sx, sy]) => (
+        <mesh key={`${sx}${sy}`} position={corner(sx, sy)} scale={[1, 1, 0.45]}>
+          <sphereGeometry args={[ROSETTE.r * width, 16, 10]} />
+          <meshStandardMaterial color="#e2c07a" roughness={0.32} metalness={1} envMapIntensity={1.1} />
+        </mesh>
+      ))}
+    </group>
+  );
+}
+
+/** How far the moulding stands off the picture, as a multiple of its profile. */
+const FRAME_DEPTH = 1.5;
+
+/**
+ * A picture hung in a gilt frame: an Art poster, an About photograph on
+ * its mat, or the photograph in the hall. Clicking it opens its exhibit.
+ */
+export function HungPicture({
   position,
   rotation,
   exhibit,
@@ -53,27 +241,58 @@ function Frame({
   onSelect,
   src,
   fallback,
+  size,
+  matted = false,
+  crop,
+  caption = true,
+  tone = GRADED_TONE,
 }: {
   position: [number, number, number];
   rotation: [number, number, number];
-  exhibit: ExhibitDatum;
+  exhibit: ExhibitDatum | null;
   active: boolean;
   onSelect: () => void;
   src: string | null;
   fallback: THREE.Texture | null;
+  /** The room the frame may take on the wall, its moulding included. */
+  size?: [number, number];
+  /** An About photograph: cropped and graded, behind a cream mat. */
+  matted?: boolean;
+  /** Crop the photograph to this and grade it into the museum's palette. */
+  crop?: PhotoCrop;
+  /** Letter the exhibit's title under the frame. */
+  caption?: boolean;
+  /** How bright a graded print is drawn, where it is not the About wall's. */
+  tone?: string;
 }) {
   const [hovered, setHovered] = useState(false);
-  const photo = usePhoto(src);
-  const lit = hovered || active;
+  /*
+    Every picture reaches the screen in its own colours unless it is
+    given a crop to grade it (see exactPrint and gradedPhoto).
+  */
+  const photo = usePhoto(src, crop, !crop);
   /*
     Hung large. These are fixed to the back wall, so unlike the vitrines
-    in the other rooms they cannot be moved forward to meet the visitor —
-    across a room this deep the previous 1.55 x 1.95 read as postcards.
-    A gallery sizes the work to the wall and the viewing distance, which
-    is exactly the adjustment being made here.
+    in the other rooms they cannot be moved forward to meet the visitor.
   */
-  const W = 2.3;
-  const H = 2.9;
+  const [W, H] = size ?? [2.3, 2.9];
+  /** The moulding's width. */
+  const F = matted ? 0.2 : 0.19;
+  /*
+    The picture inside the moulding. An About frame holds its mat. An Art
+    frame is made to the poster - the poster's own proportions, as large
+    as the frame's room on the wall allows - so frame and work always
+    meet exactly, as they do when a framer makes a frame for a piece.
+  */
+  const pic = useMemo<[number, number]>(() => {
+    if (matted) return [W, H];
+    const bw = W + 0.14 - F * 2;
+    const bh = H + 0.14 - F * 2;
+    const img = photo?.image as { width?: number; height?: number } | undefined;
+    if (!img?.width || !img?.height) return [bw, bh];
+    const aspect = img.width / img.height;
+    return aspect > bw / bh ? [bw, bw / aspect] : [bh * aspect, bh];
+  }, [photo, matted, W, H, F]);
 
   useEffect(() => {
     if (!hovered) return;
@@ -83,91 +302,48 @@ function Frame({
     };
   }, [hovered]);
 
-  const lightRef = useRef<THREE.SpotLight>(null);
-  const targetRef = useRef<THREE.Object3D>(null);
-  useEffect(() => {
-    const l = lightRef.current;
-    const t = targetRef.current;
-    if (!l || !t) return;
-    l.target = t;
-    t.updateMatrixWorld();
-  }, []);
-
   return (
     <group position={position} rotation={rotation}>
-      {/* brushed dark bezel */}
-      <mesh position={[0, 0, -0.04]}>
-        <boxGeometry args={[W + 0.14, H + 0.14, 0.08]} />
-        <meshStandardMaterial
-          color={GOLD.metal}
-          roughness={0.28}
-          metalness={1}
-          envMapIntensity={1.5}
-        />
+      {/* a soft shadow on the wall behind the frame, a little below it */}
+      <mesh position={[0, -0.1, -0.295]} renderOrder={1}>
+        <planeGeometry args={[pic[0] + F * 2 + 0.6, pic[1] + F * 2 + 0.6]} />
+        <meshBasicMaterial color="#000000" map={wallShadowTexture()} transparent opacity={0.55} depthWrite={false} />
       </mesh>
-      {/* the light line around the picture, which is what makes it read
-          as a display rather than a painting */}
-      {[
-        { p: [0, H / 2 + 0.05, 0.02], s: [W + 0.1, 0.012, 0.012] },
-        { p: [0, -(H / 2 + 0.05), 0.02], s: [W + 0.1, 0.012, 0.012] },
-        { p: [-(W / 2 + 0.05), 0, 0.02], s: [0.012, H + 0.1, 0.012] },
-        { p: [W / 2 + 0.05, 0, 0.02], s: [0.012, H + 0.1, 0.012] },
-      ].map((b, i) => (
-        <mesh key={i} position={b.p as [number, number, number]}>
-          <boxGeometry args={b.s as [number, number, number]} />
-          <meshStandardMaterial
-            color={GOLD.core}
-            emissive={GOLD.core}
-            emissiveIntensity={lit ? EMIT.hairlineLit : EMIT.hairline}
-            toneMapped={false}
-          />
+
+      <GiltFrame w={pic[0]} h={pic[1]} width={F} />
+
+      {matted ? (
+        <MattedPicture W={W} H={H} photo={photo} fallback={fallback} />
+      ) : (
+        <mesh position={[0, 0, PICTURE_Z]}>
+          <planeGeometry args={pic} />
+          {/*
+            Unlit: the poster shows its own colours, not the room's light
+            on them. A lit print took the warm spots' colour and their
+            falloff, which is exactly what it should not do here.
+          */}
+          {photo ? (
+            <meshBasicMaterial map={photo} color={crop ? tone : "#ffffff"} />
+          ) : (
+            <meshStandardMaterial map={fallback ?? undefined} roughness={0.82} metalness={0} />
+          )}
         </mesh>
-      ))}
-
-      {/* the photograph, or the mount until one is added */}
-      <mesh position={[0, 0, 0.032]}>
-        <planeGeometry args={[W, H]} />
-        <meshStandardMaterial
-          map={photo ?? fallback ?? undefined}
-          roughness={0.82}
-          metalness={0}
-        />
-      </mesh>
-
-      {/* picture light on a small arm */}
-      <mesh position={[0, H / 2 + 0.26, 0.3]}>
-        <boxGeometry args={[W * 0.45, 0.06, 0.13]} />
-        <meshStandardMaterial
-          color={MID.bronze}
-          emissive={GOLD.core}
-          emissiveIntensity={lit ? EMIT.panel * 2 : EMIT.panel}
-          roughness={0.3}
-          metalness={0.85}
-        />
-      </mesh>
-      <spotLight
-        ref={lightRef}
-        position={[0, H / 2 + 0.24, 0.62]}
-        angle={0.66}
-        penumbra={0.86}
-        intensity={lit ? 120 : 72}
-        color={GOLD.light}
-        distance={6.5}
-        decay={2}
-      />
-      <object3D ref={targetRef} position={[0, -0.15, 0]} />
+      )}
 
       {/* title under the frame, and the click target */}
-      <group position={[0, -(H / 2 + 0.32), 0.05]}>
-        <ExhibitText text={exhibit.title} position={[0, 0, 0]} height={0.17} active={active} />
+      <group position={[0, -(pic[1] / 2 + F + 0.17), 0.05]}>
+        {exhibit && caption ? (
+          <ExhibitText text={exhibit.title} position={[0, 0, 0]} height={0.17} active={active} />
+        ) : null}
       </group>
 
       <mesh
-        position={[0, 0, 0.1]}
+        position={[0, 0, 0.12]}
         visible={false}
         onPointerOver={(e) => {
           e.stopPropagation();
-          setHovered(true);
+          // only something that opens a card earns the pointer
+          if (exhibit) setHovered(true);
         }}
         onPointerOut={() => setHovered(false)}
         onClick={(e) => {
@@ -176,7 +352,7 @@ function Frame({
           onSelect();
         }}
       >
-        <planeGeometry args={[W + 0.4, H + 0.9]} />
+        <planeGeometry args={[pic[0] + F * 2 + 0.2, pic[1] + F * 2 + 0.6]} />
       </mesh>
     </group>
   );
@@ -190,35 +366,37 @@ function Frame({
  * boundary when a file is missing, which would blank the whole room until
  * the photographs are actually added.
  */
-function usePhoto(src: string | null): THREE.Texture | null {
+function usePhoto(src: string | null, crop?: PhotoCrop, exact = false): THREE.Texture | null {
   const [tex, setTex] = useState<THREE.Texture | null>(null);
 
   useEffect(() => {
     if (!src) return;
     let alive = true;
     let loaded: THREE.Texture | null = null;
-    new THREE.TextureLoader().load(
-      src,
-      (t) => {
-        if (!alive) {
-          t.dispose();
-          return;
-        }
-        t.colorSpace = THREE.SRGBColorSpace;
-        t.anisotropy = 8;
-        loaded = t;
-        setTex(t);
-      },
-      undefined,
-      () => {
-        // no file yet: the mount stays, nothing breaks
-      },
-    );
+    const take = (t: THREE.Texture) => {
+      if (!alive) {
+        t.dispose();
+        return;
+      }
+      t.colorSpace = THREE.SRGBColorSpace;
+      t.anisotropy = 8;
+      loaded = t;
+      setTex(t);
+    };
+    // no file yet: the mount stays, nothing breaks
+    const missing = () => {};
+    if (crop) {
+      gradedPhoto(src, crop).then((canvas) => take(new THREE.CanvasTexture(canvas)), missing);
+    } else if (exact) {
+      exactPrint(src).then((canvas) => take(new THREE.CanvasTexture(canvas)), missing);
+    } else {
+      new THREE.TextureLoader().load(src, take, undefined, missing);
+    }
     return () => {
       alive = false;
       loaded?.dispose();
     };
-  }, [src]);
+  }, [src, crop, exact]);
 
   return tex;
 }
@@ -228,7 +406,513 @@ function usePhoto(src: string | null): THREE.Texture | null {
  * walls hung with framed photographs, each opening its own text when
  * clicked. Cases would have said "artefact"; frames say "person".
  */
-export function PortraitWall({
+/**
+ * Reads the families next/font registered for the page.
+ *
+ * next/font serves its faces under generated names, so the canvas has to
+ * ask for the CSS variable's value rather than a family it can spell.
+ * Falls back to Georgia, which every platform has, so a board drawn
+ * before the fonts arrive is still a serif board and never a sans one.
+ */
+function pageFonts() {
+  if (typeof document === "undefined") return { book: "Georgia, serif", display: "Georgia, serif" };
+  const root = getComputedStyle(document.documentElement);
+  return {
+    book: root.getPropertyValue("--font-cormorant").trim() || "Georgia, serif",
+    display: root.getPropertyValue("--font-instrument").trim() || "Georgia, serif",
+  };
+}
+
+/** Lines that fit `max` pixels wide at the context's current font. */
+function wrapLines(ctx: CanvasRenderingContext2D, text: string, max: number) {
+  const words = text.split(/\s+/).filter(Boolean);
+  const lines: string[] = [];
+  let line = "";
+  for (const word of words) {
+    const next = line ? `${line} ${word}` : word;
+    if (ctx.measureText(next).width > max && line) {
+      lines.push(line);
+      line = word;
+    } else {
+      line = next;
+    }
+  }
+  if (line) lines.push(line);
+  return lines;
+}
+
+/** A small curl in one corner of the inner frame, drawn about (0,0). */
+function cornerCurl(ctx: CanvasRenderingContext2D, x: number, y: number, sx: number, sy: number) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.scale(sx, sy);
+  ctx.beginPath();
+  ctx.moveTo(0, 46);
+  ctx.lineTo(0, 10);
+  ctx.quadraticCurveTo(0, 0, 10, 0);
+  ctx.lineTo(46, 0);
+  ctx.moveTo(14, 34);
+  ctx.quadraticCurveTo(14, 14, 34, 14);
+  ctx.moveTo(24, 26);
+  ctx.quadraticCurveTo(24, 24, 26, 24);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.arc(7, 7, 2.6, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
+
+/**
+ * An interpretive panel, drawn to a canvas.
+ *
+ * Laid out the way a heritage museum sets its wall text: a small
+ * catalogue mark and a location line above the title, a fleuron rule
+ * beneath it, then the text itself opening on a drop cap - inside a
+ * frame ruled twice, with a curl at each inner corner. The one modern
+ * thing on it is the lit edge along the foot, which is what ties it to
+ * the glowing seams on the cases in the hall.
+ *
+ * The title wraps and steps its size down until it fits, rather than
+ * being drawn on one line and cut off at the board's edge.
+ */
+function usePlaqueTexture(
+  number: string,
+  eyebrow: string,
+  title: string,
+  body: string,
+  fontsReady: boolean,
+) {
+  const texture = useMemo(() => {
+    const W = 768;
+    const H = 972;
+    const canvas = document.createElement("canvas");
+    canvas.width = W;
+    canvas.height = H;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return null;
+    const { book, display } = pageFonts();
+    const track = (px: string) => {
+      if ("letterSpacing" in ctx) ctx.letterSpacing = px;
+    };
+
+    // ground: warm near-black, lifted a little at the head
+    const ground = ctx.createLinearGradient(0, 0, 0, H);
+    ground.addColorStop(0, "#1e150e");
+    ground.addColorStop(0.55, "#140e09");
+    ground.addColorStop(1, "#0d0906");
+    ctx.fillStyle = ground;
+    ctx.fillRect(0, 0, W, H);
+
+    // the grain of printed board, seeded so it never shifts between redraws
+    let seed = 7;
+    const rand = () => {
+      seed = (seed * 16807) % 2147483647;
+      return seed / 2147483647;
+    };
+    for (let i = 0; i < 9000; i += 1) {
+      ctx.fillStyle = rand() > 0.5 ? "rgba(255,230,190,0.035)" : "rgba(0,0,0,0.12)";
+      ctx.fillRect(rand() * W, rand() * H, 1.4, 1.4);
+    }
+
+    // the frame, ruled twice
+    ctx.strokeStyle = "rgba(201,162,39,0.62)";
+    ctx.lineWidth = 2;
+    ctx.strokeRect(26, 26, W - 52, H - 52);
+    ctx.strokeStyle = "rgba(201,162,39,0.26)";
+    ctx.lineWidth = 1.2;
+    ctx.strokeRect(38, 38, W - 76, H - 76);
+
+    ctx.strokeStyle = "rgba(201,162,39,0.7)";
+    ctx.fillStyle = "rgba(201,162,39,0.7)";
+    ctx.lineWidth = 1.6;
+    cornerCurl(ctx, 48, 48, 1, 1);
+    cornerCurl(ctx, W - 48, 48, -1, 1);
+    cornerCurl(ctx, 48, H - 48, 1, -1);
+    cornerCurl(ctx, W - 48, H - 48, -1, -1);
+
+    const left = 96;
+    const width = W - left * 2;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "alphabetic";
+
+    // catalogue mark
+    ctx.fillStyle = "#b8924a";
+    ctx.font = `500 21px ${book}`;
+    track("7px");
+    ctx.fillText(number.toUpperCase(), W / 2, 132);
+    track("0px");
+
+    // location line, in italic
+    ctx.fillStyle = "#a98d5e";
+    ctx.font = `italic 400 30px ${book}`;
+    ctx.fillText(eyebrow, W / 2, 178);
+
+    // title: the largest size at which it fits in two lines
+    let size = 76;
+    let titleLines: string[] = [];
+    for (; size >= 40; size -= 4) {
+      ctx.font = `400 ${size}px ${display}`;
+      titleLines = wrapLines(ctx, title, width);
+      if (titleLines.length <= 2) break;
+    }
+    ctx.fillStyle = "#efdfbd";
+    ctx.shadowColor = "rgba(201,162,39,0.35)";
+    ctx.shadowBlur = 14;
+    let y = 178 + size * 1.15;
+    for (const line of titleLines) {
+      ctx.fillText(line, W / 2, y);
+      y += size * 1.05;
+    }
+    ctx.shadowBlur = 0;
+
+    // the fleuron rule
+    y += 6;
+    const rule = (x0: number, x1: number, fadeIn: boolean) => {
+      const g = ctx.createLinearGradient(x0, 0, x1, 0);
+      g.addColorStop(0, fadeIn ? "rgba(201,162,39,0)" : "rgba(201,162,39,0.6)");
+      g.addColorStop(1, fadeIn ? "rgba(201,162,39,0.6)" : "rgba(201,162,39,0)");
+      ctx.fillStyle = g;
+      ctx.fillRect(x0, y - 9, x1 - x0, 1.6);
+    };
+    rule(left + 20, W / 2 - 36, true);
+    rule(W / 2 + 36, W - left - 20, false);
+    /*
+      The ornament is drawn, not typed. A fleuron glyph depends on the
+      face carrying it, and the Garamond served here is a Latin subset
+      without one - it rendered as a missing-glyph box. A lozenge between
+      two points is the printer's ornament it stood in for, and a shape
+      cannot be missing.
+    */
+    ctx.fillStyle = "#c9a227";
+    ctx.beginPath();
+    ctx.moveTo(W / 2, y - 21);
+    ctx.lineTo(W / 2 + 11, y - 9);
+    ctx.lineTo(W / 2, y + 3);
+    ctx.lineTo(W / 2 - 11, y - 9);
+    ctx.closePath();
+    ctx.fill();
+    for (const dx of [-22, 22]) {
+      ctx.beginPath();
+      ctx.arc(W / 2 + dx, y - 9, 2.6, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // body, opening on a drop cap
+    y += 60;
+    ctx.textAlign = "left";
+    const text = body.trim();
+    if (text) {
+      const bodySize = 35;
+      const lead = bodySize * 1.42;
+      /*
+        Sized and set so its foot sits on the third line's baseline and
+        its top meets the first line's cap height, which is how a drop
+        cap is set in print. Placed any higher it floats in the margin.
+      */
+      const capSize = 150;
+      ctx.font = `400 ${capSize}px ${display}`;
+      const cap = text[0];
+      const capW = ctx.measureText(cap).width + 16;
+      ctx.fillStyle = "#c9a227";
+      ctx.shadowColor = "rgba(201,162,39,0.4)";
+      ctx.shadowBlur = 12;
+      ctx.fillText(cap, left - 2, y + lead * 2 + 2);
+      ctx.shadowBlur = 0;
+
+      ctx.font = `400 ${bodySize}px ${book}`;
+      ctx.fillStyle = "#d6c4a0";
+      // the first three lines run beside the cap, the rest full width
+      const words = text.slice(1).split(/\s+/).filter(Boolean);
+      const limit = H - 150;
+      let line = "";
+      let n = 0;
+      for (const word of words) {
+        const indent = n < 3 ? capW : 0;
+        const next = line ? `${line} ${word}` : word;
+        if (ctx.measureText(next).width > width - indent && line) {
+          ctx.fillText(line, left + indent, y);
+          y += lead;
+          n += 1;
+          line = word;
+          if (y > limit) {
+            line = "";
+            break;
+          }
+        } else {
+          line = next;
+        }
+      }
+      if (line && y <= limit) ctx.fillText(line, left + (n < 3 ? capW : 0), y);
+    }
+
+    // the credit line a museum closes its panels with
+    ctx.textAlign = "center";
+    ctx.fillStyle = "rgba(169,141,94,0.85)";
+    ctx.font = `italic 400 26px ${book}`;
+    ctx.fillText("From the collection of Daksh Kumar", W / 2, H - 104);
+    ctx.fillStyle = "rgba(201,162,39,0.45)";
+    ctx.fillRect(W / 2 - 40, H - 90, 80, 1.4);
+
+    // the one modern touch: a lit edge along the foot
+    const edge = ctx.createLinearGradient(60, 0, W - 60, 0);
+    edge.addColorStop(0, "rgba(255,214,140,0)");
+    edge.addColorStop(0.5, "rgba(255,226,170,0.95)");
+    edge.addColorStop(1, "rgba(255,214,140,0)");
+    ctx.shadowColor = "rgba(255,182,63,0.9)";
+    ctx.shadowBlur = 18;
+    ctx.fillStyle = edge;
+    ctx.fillRect(60, H - 60, W - 120, 2.5);
+    ctx.shadowBlur = 0;
+
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    tex.anisotropy = 8;
+    return tex;
+    // fontsReady is listed on purpose: it redraws the board once the real
+    // faces have arrived, replacing the Georgia fallback
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [number, eyebrow, title, body, fontsReady]);
+
+  useEffect(() => () => texture?.dispose(), [texture]);
+  return texture;
+}
+
+/** True once the page's web fonts have finished loading. */
+function useFontsReady() {
+  const [ready, setReady] = useState(false);
+  useEffect(() => {
+    if (typeof document === "undefined" || !document.fonts) return;
+    let alive = true;
+    document.fonts.ready.then(() => {
+      if (alive) setReady(true);
+    });
+    return () => {
+      alive = false;
+    };
+  }, []);
+  return ready;
+}
+
+/**
+ * A free-standing reading board.
+ *
+ * The interpretive panel a museum stands on the floor between the
+ * works, and built like one: a moulded cornice over the board, a
+ * two-step surround, a slender bronze post with a collar where it meets
+ * the board, and a plinth rather than a flat foot. The post carries a
+ * lit seam, the same one the vitrine posts have, so the board belongs to
+ * the same hall as the cases.
+ *
+ * Tilted back a little at the top, which is what a reading board does:
+ * it squares the surface to someone standing in front of it.
+ */
+function TextStand({
+  position,
+  rotation,
+  exhibit,
+  number,
+  active,
+  onSelect,
+}: {
+  position: [number, number, number];
+  rotation: [number, number, number];
+  exhibit: ExhibitDatum;
+  number: string;
+  active: boolean;
+  onSelect: () => void;
+}) {
+  const fontsReady = useFontsReady();
+  const texture = usePlaqueTexture(
+    number,
+    exhibit.meta ?? "",
+    exhibit.title,
+    exhibit.body ?? "",
+    fontsReady,
+  );
+  const [hovered, setHovered] = useState(false);
+  const lit = hovered || active;
+
+  const W = 1.5;
+  const H = 1.9;
+  /** Where the bottom of the board sits above the floor. */
+  const LIFT = 0.95;
+  const TILT = -0.16;
+  const POST = LIFT - 0.2;
+
+  useEffect(() => {
+    if (!hovered) return;
+    document.body.style.cursor = "pointer";
+    return () => {
+      document.body.style.cursor = "";
+    };
+  }, [hovered]);
+
+  return (
+    <group
+      position={position}
+      rotation={rotation}
+      onPointerOver={(e) => {
+        e.stopPropagation();
+        setHovered(true);
+      }}
+      onPointerOut={() => setHovered(false)}
+      onClick={(e) => {
+        e.stopPropagation();
+        if (consumedDrag()) return;
+        onSelect();
+      }}
+    >
+      {/* plinth: two steps, so the stand sits on something */}
+      <mesh position={[0, 0.07, 0]}>
+        <boxGeometry args={[0.82, 0.14, 0.56]} />
+        <meshStandardMaterial color="#0d0b0a" roughness={0.62} metalness={0.25} />
+      </mesh>
+      <mesh position={[0, 0.17, 0]}>
+        <boxGeometry args={[0.6, 0.07, 0.42]} />
+        <meshStandardMaterial
+          color={MID.bronze}
+          roughness={0.4}
+          metalness={0.86}
+          envMapIntensity={1.2}
+        />
+      </mesh>
+      <mesh position={[0, 0.006, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+        <planeGeometry args={[1.3, 1.05]} />
+        <meshBasicMaterial color="#000000" transparent opacity={0.4} depthWrite={false} />
+      </mesh>
+
+      {/* the post, with a lit seam up its face */}
+      <mesh position={[0, 0.2 + POST / 2, 0]}>
+        <boxGeometry args={[0.1, POST, 0.1]} />
+        <meshStandardMaterial
+          color={MID.bronze}
+          roughness={0.36}
+          metalness={0.92}
+          envMapIntensity={1.35}
+        />
+      </mesh>
+      <mesh position={[0, 0.2 + POST / 2, 0.052]}>
+        <boxGeometry args={[0.014, POST * 0.9, 0.006]} />
+        <meshStandardMaterial
+          color={GOLD.core}
+          emissive={GOLD.core}
+          emissiveIntensity={lit ? 3.2 : 1.8}
+          toneMapped={false}
+        />
+      </mesh>
+      {/* collar where the post meets the board */}
+      <mesh position={[0, LIFT - 0.02, 0]}>
+        <boxGeometry args={[0.26, 0.07, 0.16]} />
+        <meshStandardMaterial
+          color={MID.bronze}
+          roughness={0.34}
+          metalness={0.92}
+          envMapIntensity={1.4}
+        />
+      </mesh>
+
+      <group position={[0, LIFT + H / 2, 0]} rotation={[TILT, 0, 0]}>
+        {/* the surround, in two steps */}
+        <mesh position={[0, 0, -0.05]}>
+          <boxGeometry args={[W + 0.2, H + 0.2, 0.06]} />
+          <meshStandardMaterial
+            color={MID.bronze}
+            roughness={0.4}
+            metalness={0.86}
+            envMapIntensity={1.25}
+          />
+        </mesh>
+        <mesh position={[0, 0, -0.018]}>
+          <boxGeometry args={[W + 0.08, H + 0.08, 0.03]} />
+          <meshStandardMaterial color="#0f0b08" roughness={0.6} metalness={0.4} />
+        </mesh>
+
+        {/* the panel itself */}
+        <mesh position={[0, 0, 0.001]}>
+          <planeGeometry args={[W, H]} />
+          <meshStandardMaterial
+            map={texture ?? undefined}
+            emissiveMap={texture ?? undefined}
+            emissive="#ffffff"
+            emissiveIntensity={lit ? 0.62 : 0.42}
+            roughness={0.72}
+            toneMapped={false}
+          />
+        </mesh>
+
+        {/* a moulded cornice over the board */}
+        <mesh position={[0, H / 2 + 0.13, -0.02]}>
+          <boxGeometry args={[W + 0.32, 0.07, 0.14]} />
+          <meshStandardMaterial
+            color={MID.bronze}
+            roughness={0.36}
+            metalness={0.9}
+            envMapIntensity={1.4}
+          />
+        </mesh>
+        <mesh position={[0, H / 2 + 0.185, -0.03]}>
+          <boxGeometry args={[W + 0.42, 0.04, 0.18]} />
+          <meshStandardMaterial
+            color={MID.bronze}
+            roughness={0.34}
+            metalness={0.92}
+            envMapIntensity={1.5}
+          />
+        </mesh>
+        {/* the lip of the cornice, lit from beneath */}
+        <mesh position={[0, H / 2 + 0.094, 0.05]}>
+          <boxGeometry args={[W + 0.24, 0.014, 0.012]} />
+          <meshStandardMaterial
+            color={GOLD.core}
+            emissive={GOLD.core}
+            emissiveIntensity={lit ? 4 : 2.2}
+            toneMapped={false}
+          />
+        </mesh>
+      </group>
+    </group>
+  );
+}
+
+/**
+ * The art wall, hung as a salon: the posters in rows of four and three,
+ * the narrower row centred under the wider the way a salon hang steps,
+ * and the video thumbnails in a row of their own beneath them.
+ *
+ * Each frame is made to its piece (see HungPicture), so a poster of any
+ * proportion is shown whole and the frame meets it exactly.
+ */
+
+/** The posters to hang, best first: each takes the next slot in HANG_ORDER. */
+const ART_FILES = [
+  "/museum/art-1.webp", // Cultural Fashion Show
+  "/museum/art-2.webp", // RHUL International Society, Term 1 wrap
+  "/museum/art-3.webp", // Potluck
+  "/museum/art-4.webp", // Movie Night
+  "/museum/art-5.webp", // Upcoming events, Sep/Oct
+  "/museum/art-6.webp", // Night of Nations
+  "/museum/art-7.webp", // Rush Rally
+];
+
+/** Video thumbnails, left to right along the bottom row. */
+const THUMB_FILES = [
+  "/museum/thumb-1.webp", // Get Rich with A.I
+  "/museum/thumb-2.webp", // Escape this
+  "/museum/thumb-3.webp", // Interviewing Brown Marlon
+  "/museum/thumb-4.webp", // The Untold Story
+  "/museum/thumb-5.webp", // Insanity?
+];
+
+/**
+ * Which frame each poster goes in: the middle of the middle row first,
+ * then either side of it, then the top row working outward. A salon hang
+ * puts its strongest piece at the heart of the wall rather than in the
+ * first corner a left-to-right fill would reach.
+ */
+const HANG_ORDER = [5, 4, 6, 1, 2, 0, 3];
+const ART_TOTAL = ART_ROWS.reduce((n, row) => n + row, 0);
+
+export function ArtWall({
   door,
   items,
   activeId,
@@ -241,38 +925,128 @@ export function PortraitWall({
 }) {
   const fallback = useMountTexture();
   const sgn = door.side === "left" ? -1 : 1;
+  const yaw = sgn > 0 ? -Math.PI / 2 : Math.PI / 2;
+
+  /*
+    Three rows that fit the wall's height and four across its width, with
+    air around each. The slots come from roomLayout, so the lights over
+    the wall and the camera framing it agree with where the frames hang.
+  */
+  const slots = artSlots(door);
+  const thumbs = thumbSlots(door, THUMB_FILES.length);
+  // every piece on this wall is the same body of work, and opens its card
+  const work = items[0] ?? null;
+  const open = () => work && onSelect(work);
+  const isOpen = Boolean(work) && activeId === work?.id;
+
+  return (
+    <group>
+      {thumbs.map((position, i) => (
+        <HungPicture
+          key={`thumb${i}`}
+          position={position}
+          rotation={[0, yaw, 0]}
+          exhibit={work}
+          active={isOpen}
+          onSelect={open}
+          src={THUMB_FILES[i]}
+          fallback={fallback}
+          size={THUMB_SIZE}
+          caption={false}
+        />
+      ))}
+      {slots.map((slot) => {
+        // which poster, if any, hangs in this frame
+        const k = HANG_ORDER.indexOf(slot.key);
+        return (
+          <HungPicture
+            key={slot.key}
+            position={slot.position}
+            rotation={[0, yaw, 0]}
+            exhibit={work}
+            active={isOpen}
+            onSelect={open}
+            src={ART_FILES[k] ?? null}
+            fallback={fallback}
+            size={ART_SIZE}
+            caption={k === 0}
+          />
+        );
+      })}
+    </group>
+  );
+}
+
+export { ART_TOTAL };
+
+export function PortraitWall({
+  door,
+  items,
+  activeId,
+  onSelect,
+  photos = PHOTO_FILES,
+  bench = true,
+}: {
+  door: DoorSpec;
+  items: ExhibitDatum[];
+  activeId: string | null;
+  onSelect: (exhibit: ExhibitDatum) => void;
+  /** Photographs to hang. Pass [] for frames waiting on their pictures. */
+  photos?: (PhotoSpec | null)[];
+  bench?: boolean;
+}) {
+  const fallback = useMountTexture();
+  const sgn = door.side === "left" ? -1 : 1;
   const [cx, cz] = roomCenter(door);
-  const backX = cx + sgn * (ROOM_DEPTH / 2 - 0.3);
 
   // three frames across the back wall, evenly spaced
   const picks = items.slice(0, 3);
   const yaw = sgn > 0 ? -Math.PI / 2 : Math.PI / 2;
 
+  // the plaques go in the gaps: whatever the room has after the pictures
+  const plaques = items.slice(3, 5);
+
   /*
-    Hung at eye level, not at a fraction of the ceiling. That was
-    ROOM_H * 0.46, which was already high in a nine-unit alcove and put
-    the pictures six units up once the rooms took the corridor's own
-    head height. A gallery hangs to the centre of the picture at about
-    1.5m whatever the room does above it.
+    Hung to the middle of the wall the camera is actually looking at, wide
+    enough apart to put a reading stand between each pair. The positions
+    come from roomLayout, shared with the lights and the camera.
   */
-  const HANG_Y = 2.85;
-  /** One pitch for the run, so three frames read as a hang, not a scatter. */
-  const PITCH = 4.2;
+  const { frames, lecterns } = portraitSlots(door, picks.length, plaques.length);
 
   return (
     <group>
       {picks.map((exhibit, i) => {
-        const spread = picks.length === 1 ? 0 : (i - (picks.length - 1) / 2) * PITCH;
         return (
-          <Frame
+          <HungPicture
             key={exhibit.id}
-            position={[backX, HANG_Y, cz + spread]}
+            position={frames[i]}
             rotation={[0, yaw, 0]}
             exhibit={exhibit}
             active={activeId === exhibit.id}
             onSelect={() => onSelect(exhibit)}
-            src={PHOTO_FILES[i] ?? null}
+            src={photos[i]?.src ?? null}
+            crop={photos[i]?.crop}
             fallback={fallback}
+            matted
+          />
+        );
+      })}
+
+      {/*
+        Reading boards on the floor, standing in the gaps between the
+        pictures. Set a little out from the wall so they are objects in
+        the room rather than more things stuck to it.
+      */}
+      {plaques.map((exhibit, i) => {
+        return (
+          <TextStand
+            key={exhibit.id}
+            number={`No. ${["I", "II", "III", "IV"][i] ?? i + 1}`}
+            position={lecterns[i]}
+            rotation={[0, yaw, 0]}
+            exhibit={exhibit}
+            active={activeId === exhibit.id}
+            onSelect={() => onSelect(exhibit)}
           />
         );
       })}
@@ -282,10 +1056,17 @@ export function PortraitWall({
         Set back far enough from the wall to be a real viewing distance
         now that the room has the depth for one.
       */}
-      <mesh position={[cx - sgn * 2.4, 0.26, cz]}>
-        <boxGeometry args={[0.9, 0.52, 4.4]} />
-        <meshStandardMaterial color={MID.plinth} roughness={0.5} metalness={0.3} envMapIntensity={0.9} />
-      </mesh>
+      {bench ? (
+        <mesh position={[cx - sgn * 2.4, 0.26, cz]}>
+          <boxGeometry args={[0.9, 0.52, 4.4]} />
+          <meshStandardMaterial
+            color={MID.plinth}
+            roughness={0.5}
+            metalness={0.3}
+            envMapIntensity={0.9}
+          />
+        </mesh>
+      ) : null}
     </group>
   );
 }
