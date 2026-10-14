@@ -1,0 +1,847 @@
+/*
+  The loading screen, and the sound switch that sits over it.
+
+  The first door: two thick dark leaves meeting at a crack, the first name
+  on the left and the last on the right, warm light leaking through. One
+  thing is large (the name) and everything else is small and quiet, which
+  is what makes it read as composed rather than templated.
+
+  Heritage is the architecture here, not decoration: a recessed panel in
+  each leaf, one band of ajrak lattice along the outer edge, a pointed arch
+  across both, brass pulls. All of it is hairline and low in contrast. If
+  it can be seen clearly at a glance it is too strong, and the screen drifts
+  back toward an invitation card.
+
+  The two typefaces are set here and nowhere else in this file, so
+  changing either is one line:
+    --veil-serif   the name and the number
+    --veil-mono    every label
+*/
+
+.veil {
+  --veil-serif: var(--font-cormorant), "Cormorant Garamond", Georgia, serif;
+  --veil-mono: var(--font-plex-mono), ui-monospace, "SFMono-Regular", Menlo, monospace;
+  --gold: #c8944a;
+  --gold-hi: #e0b070;
+  --sand: #b89a72;
+  --panel: #1a110b;
+  --cyan: #5ad1d6;
+  --slide: 1.4s cubic-bezier(0.76, 0, 0.24, 1);
+
+  --name: clamp(52px, 10vw, 160px);
+  /* how far the name stands from the crack: far enough to leave room for the pulls */
+  --name-gap: 56px;
+  /* the recessed panel: from the outer edge, from the crack, from top and bottom */
+  --edge: 5vw;
+  --stile: max(5vw, 46px);
+  --rail: 8vh;
+  /* the pull's distance from the crack */
+  --pull: 28px;
+
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  /* no background of its own: the panels carry it, so the hall shows through as they part */
+}
+
+/* hairlines sit on whole pixels, or they blur */
+@supports (left: round(1.5px, 1px)) {
+  .veil {
+    --edge: round(5vw, 1px);
+    --stile: round(max(5vw, 46px), 1px);
+    --rail: round(8vh, 1px);
+  }
+}
+
+.veil-open {
+  pointer-events: none;
+}
+
+/* ------------------------------------------------------------------ */
+/* The two leaves                                                      */
+/* ------------------------------------------------------------------ */
+
+.veil-panel {
+  position: relative;
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+  background-color: var(--panel);
+  transition: transform var(--slide);
+}
+
+/*
+  Material. Each leaf is a slab, not a fill: darkest along the edge that
+  meets the crack, as a door's thickness would be, with a faint vignette to
+  the outer edge. Each draws its half of one vignette centred on the seam,
+  so the two read as a single screen until they part. Dark wood grain over
+  the top, very faint: long streaks running down the leaf.
+*/
+.veil-panel::before,
+.veil-panel::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.veil-panel-left::before {
+  background:
+    linear-gradient(to left, rgba(0, 0, 0, 0.4) 0, rgba(0, 0, 0, 0) 80px),
+    radial-gradient(ellipse 62vw 85vh at 100% 50%, rgba(13, 8, 5, 0) 38%, #0d0805 100%);
+}
+
+.veil-panel-right::before {
+  background:
+    linear-gradient(to right, rgba(0, 0, 0, 0.4) 0, rgba(0, 0, 0, 0) 80px),
+    radial-gradient(ellipse 62vw 85vh at 0% 50%, rgba(13, 8, 5, 0) 38%, #0d0805 100%);
+}
+
+/* fine across the leaf, long down it: the grain of boards, tinted warm */
+.veil-panel::after {
+  opacity: 0.035;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='320' height='320'%3E%3Cfilter id='w' x='0' y='0' width='100%25' height='100%25'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9 .011' numOctaves='3' seed='4' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .78  0 0 0 0 .58  0 0 0 0 .29  2 0 0 0 -.45'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23w)'/%3E%3C/svg%3E");
+  background-size: 320px 320px;
+}
+
+.veil-panel-left {
+  justify-content: flex-end;
+  padding-right: var(--name-gap);
+}
+
+.veil-panel-right {
+  justify-content: flex-start;
+  padding-left: var(--name-gap);
+}
+
+/* the name hugs the crack from its own side */
+.veil-col {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.veil-panel-left .veil-col {
+  align-items: flex-end;
+}
+
+.veil-panel-right .veil-col {
+  align-items: flex-start;
+}
+
+/* ------------------------------------------------------------------ */
+/* The architecture: molding, band, arch, pulls                        */
+/* ------------------------------------------------------------------ */
+
+/*
+  The recessed panel: a 1px gold rectangle, and a second 10px inside it.
+  Four separate lines rather than a border, so they can be drawn one after
+  another round the rectangle. They are plain divs, so every edge lands on
+  a whole pixel at any screen size.
+*/
+.veil-frame {
+  --step: 0;
+  --base: 0.25s;
+  --a: 0.25;
+  position: absolute;
+  top: var(--rail);
+  bottom: var(--rail);
+  pointer-events: none;
+}
+
+.veil-panel-left .veil-frame {
+  left: var(--edge);
+  right: var(--stile);
+}
+
+.veil-panel-right .veil-frame {
+  left: var(--stile);
+  right: var(--edge);
+}
+
+.veil-frame-in {
+  --base: 0.4s;
+  --a: 0.12;
+  position: absolute;
+  inset: 10px;
+}
+
+.veil-hair {
+  position: absolute;
+  background: rgba(200, 148, 74, var(--a));
+  animation: veil-hair-x 0.3s ease-out both;
+  animation-delay: calc(var(--base) + var(--step) * 0.3s);
+}
+
+.veil-hair-t,
+.veil-hair-b {
+  left: 0;
+  right: 0;
+  height: 1px;
+}
+
+.veil-hair-r,
+.veil-hair-l {
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  animation-name: veil-hair-y;
+}
+
+.veil-hair-t {
+  top: 0;
+  --step: 0;
+  transform-origin: 0 50%;
+}
+.veil-hair-r {
+  right: 0;
+  --step: 1;
+  transform-origin: 50% 0;
+}
+.veil-hair-b {
+  bottom: 0;
+  --step: 2;
+  transform-origin: 100% 50%;
+}
+.veil-hair-l {
+  left: 0;
+  --step: 3;
+  transform-origin: 50% 100%;
+}
+
+@keyframes veil-hair-x {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: none;
+  }
+}
+
+@keyframes veil-hair-y {
+  from {
+    transform: scaleY(0);
+  }
+  to {
+    transform: none;
+  }
+}
+
+/*
+  The ajrak band: 14px of repeating diamond and lattice line work, in the
+  margin between the screen's edge and the recessed panel, as long as the
+  panel. A border and never a fill, at about 13% gold.
+*/
+.veil-band {
+  position: absolute;
+  top: var(--rail);
+  /* an svg keeps its own height unless it is told one; top and bottom alone would not stretch it */
+  height: calc(100% - var(--rail) * 2);
+  width: 14px;
+  pointer-events: none;
+  animation: veil-fade 0.8s ease 0.7s both;
+}
+
+.veil-panel-left .veil-band {
+  left: calc((var(--edge) - 14px) / 2);
+}
+
+.veil-panel-right .veil-band {
+  right: calc((var(--edge) - 14px) / 2);
+}
+
+.veil-band path {
+  fill: none;
+  stroke: var(--gold);
+  stroke-width: 0.8;
+  stroke-opacity: 0.13;
+}
+
+.veil-band .veil-lattice {
+  stroke-opacity: 0.07;
+}
+
+/*
+  The pointed arch, one half per leaf, meeting at the apex on the crack.
+  The drawing is a unit box stretched over the whole leaf; non-scaling
+  strokes keep it one pixel at every shape of screen. It is drawn in by
+  its dash offset, the dash being as long as the line is, give or take, and
+  measured in the same viewport units the arch is laid out in.
+*/
+.veil-arch {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.veil-arch path {
+  fill: none;
+  stroke: rgba(200, 148, 74, 0.2);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+  stroke-dasharray: 1500px;
+  stroke-dasharray: calc(60vw + 80vh);
+  stroke-dashoffset: calc(60vw + 80vh);
+  animation: veil-trace 1.2s cubic-bezier(0.4, 0, 0.2, 1) 0.1s both;
+}
+
+@keyframes veil-trace {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+/*
+  Brass pulls, either side of the crack at the middle of the door: slim,
+  rounded, lit along their length. The one futuristic detail is the cyan
+  strip down the inner edge, which brightens as the door is about to open.
+  No glow: the seam's light is the only light here.
+*/
+.veil-pull {
+  position: absolute;
+  top: 50%;
+  width: 6px;
+  height: 140px;
+  margin-top: -70px;
+  border-radius: 3px;
+  background: linear-gradient(90deg, #8a6a3a 0%, #d4a95e 55%, #a98348 100%);
+  animation: veil-fade 0.6s ease 1s both;
+}
+
+.veil-panel-left .veil-pull {
+  right: var(--pull);
+}
+
+.veil-panel-right .veil-pull {
+  left: var(--pull);
+}
+
+.veil-led {
+  position: absolute;
+  top: 8px;
+  bottom: 8px;
+  width: 2px;
+  border-radius: 1px;
+  background: var(--cyan);
+  opacity: 0.7;
+}
+
+.veil-panel-left .veil-led {
+  right: 0;
+}
+
+.veil-panel-right .veil-led {
+  left: 0;
+}
+
+/* labels in the top corners: where the visitor is, and since when */
+.veil-hud {
+  position: absolute;
+  top: 28px;
+  font-family: var(--veil-mono);
+  font-size: 10px;
+  font-weight: 400;
+  line-height: 1;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  color: var(--text-muted);
+  animation: veil-fade 0.6s ease 1.2s both;
+}
+
+.veil-panel-left .veil-hud {
+  left: 32px;
+}
+
+.veil-panel-right .veil-hud {
+  right: 32px;
+}
+
+/* ------------------------------------------------------------------ */
+/* The name                                                            */
+/* ------------------------------------------------------------------ */
+
+/*
+  Each word rises out from behind a clip line: the mask clips, the word
+  moves. The padding gives the letters' overhang room inside the clip, and
+  the negative margin gives it back, so the layout is the same size as the
+  word. It waits for the lines to be drawn.
+*/
+.veil-mask {
+  display: block;
+  overflow: hidden;
+  padding: 0.1em 0.08em;
+  margin: -0.1em -0.08em;
+}
+
+/*
+  Gilded lettering on a wooden door, not type laid over it.
+
+  Four layers, all clipped to the letters, from the top down:
+   - the one light sweep: a warm band slid across the word once, each name
+     taking half of the 2.4s so it reads as one light passing left to right
+   - the light from the crack: letters near the seam a little brighter,
+     fading outward over 12vw, and brighter still as the crack widens
+     (--seam is the loading progress, set by the loader on its root)
+   - a faint grain, so the leaf is not a flat fill
+   - the leaf itself: darker gold at the top and foot of the letters, a
+     warm highlight across their middle
+  A one-pixel shadow under each letter and a fainter highlight above set it
+  into the wood. No glow: the only light on this screen is the seam's.
+*/
+.veil-word {
+  display: block;
+  font-family: var(--veil-serif);
+  font-size: var(--name);
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+  color: #c9974f;
+  background-image:
+    linear-gradient(100deg, rgba(255, 236, 196, 0) 42%, rgba(255, 236, 196, 0.5) 50%, rgba(255, 236, 196, 0) 58%),
+    linear-gradient(
+      var(--toward-seam),
+      rgba(255, 232, 184, calc(0.1 + 0.08 * var(--seam, 0))) 0,
+      rgba(255, 232, 184, 0) 12vw
+    ),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='1 0 0 0 0  1 0 0 0 0  1 0 0 0 0  0 0 0 0 .06'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23g)'/%3E%3C/svg%3E"),
+    var(--text-gold);
+  background-size:
+    300% 100%,
+    100% 100%,
+    160px 160px,
+    100% 100%;
+  background-repeat: no-repeat, no-repeat, repeat, no-repeat;
+  background-position:
+    100% 0,
+    0 0,
+    0 0,
+    0 0;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  filter: drop-shadow(0 1px 0 rgba(0, 0, 0, 0.6)) drop-shadow(0 -1px 0 rgba(255, 235, 190, 0.12));
+  transform: translateY(105%);
+  animation:
+    veil-rise 0.9s cubic-bezier(0.76, 0, 0.24, 1) 1s both,
+    veil-sweep 1.2s ease-in-out 2.1s both;
+}
+
+/* which way the seam is, for the light it throws */
+.veil-panel-left .veil-word {
+  --toward-seam: to left;
+}
+
+.veil-panel-right .veil-word {
+  --toward-seam: to right;
+}
+
+.veil-word-last {
+  /* 120ms behind the first name, and the sweep picks up where the first ends */
+  animation-delay: 1.12s, 3.3s;
+}
+
+@keyframes veil-rise {
+  from {
+    transform: translateY(105%);
+  }
+  to {
+    transform: none;
+  }
+}
+
+/* only the band moves; the light from the seam, the grain and the leaf stay where they are */
+@keyframes veil-sweep {
+  from {
+    background-position:
+      100% 0,
+      0 0,
+      0 0,
+      0 0;
+  }
+  to {
+    background-position:
+      0% 0,
+      0 0,
+      0 0,
+      0 0;
+  }
+}
+
+/*
+  What the person is, on a small plaque across the crack like the plate
+  over a door. It is the panel's own colour, so it cuts the seam behind it:
+  the line reads whole and the light runs on either side of it.
+*/
+.veil-plate {
+  position: absolute;
+  left: 50%;
+  /* below the name, and below the lower end of the pulls (70px under the middle) on a small screen */
+  top: calc(50% + max(var(--name) / 2, 70px) + 22px);
+  margin: 0;
+  padding: 8px 14px;
+  transform: translateX(-50%);
+  background: var(--panel);
+  box-shadow: 0 0 0 1px rgba(200, 148, 74, 0.16);
+  font-family: var(--veil-mono);
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  color: var(--text-muted);
+  animation: veil-fade 0.8s ease 2s both;
+}
+
+/* ------------------------------------------------------------------ */
+/* The crack                                                           */
+/* ------------------------------------------------------------------ */
+
+/*
+  Light leaking through the join. The wrapper only draws in, outward from
+  the middle; the two pieces inside are driven by the real progress. The
+  gap is 1px at the start and widens to 6px, brightest at its core, and the
+  glow around it comes up with it.
+*/
+.veil-seam {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: calc(50% - 3px);
+  width: 6px;
+  animation: veil-draw 0.4s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+
+.veil-gap,
+.veil-glow {
+  position: absolute;
+  inset: 0;
+}
+
+.veil-gap {
+  background: linear-gradient(
+    90deg,
+    rgba(224, 176, 112, 0.15),
+    #e0b070 50%,
+    rgba(224, 176, 112, 0.15)
+  );
+  transform: scaleX(0.1667);
+}
+
+.veil-glow {
+  box-shadow: 0 0 40px 6px rgba(200, 148, 74, 0.35);
+  opacity: 0.25;
+}
+
+@keyframes veil-draw {
+  from {
+    transform: scaleY(0);
+  }
+  to {
+    transform: none;
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* The number                                                          */
+/* ------------------------------------------------------------------ */
+
+/* big, quiet and low in the corner: a figure to glance at, not a label to read */
+.veil-status {
+  position: absolute;
+  left: 32px;
+  bottom: 28px;
+  display: flex;
+  align-items: baseline;
+  gap: 16px;
+  margin: 0;
+  white-space: nowrap;
+  animation: veil-fade 0.8s ease 1.2s both;
+}
+
+.veil-num {
+  min-width: 2.4ch;
+  font-family: var(--veil-serif);
+  font-size: 64px;
+  font-weight: 300;
+  line-height: 1;
+  font-variant-numeric: lining-nums tabular-nums;
+  text-align: left;
+  color: rgba(184, 154, 114, 0.55);
+}
+
+.veil-caption {
+  font-family: var(--veil-mono);
+  font-size: 11px;
+  font-weight: 400;
+  line-height: 1;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+@keyframes veil-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* Opening                                                             */
+/* ------------------------------------------------------------------ */
+
+/*
+  The light flares and the indicators brighten, and then the leaves part
+  and carry their text with them. The number and the plaque are not theirs
+  to carry, so they go first, quickly. Behind the leaves the hall's light
+  comes up over the same 1.4s on the same curve (the rule at the foot of
+  this section), so it is revealed rather than uncovered. The 0.3s head
+  start is the flare.
+*/
+.veil-open .veil-panel {
+  transition-delay: 0.3s;
+}
+
+.veil-open .veil-panel-left {
+  transform: translateX(-100%);
+}
+
+.veil-open .veil-panel-right {
+  transform: translateX(100%);
+}
+
+.veil-open .veil-gap {
+  animation: veil-flare 0.3s ease-out forwards;
+}
+
+.veil-open .veil-glow {
+  animation: veil-glow-flare 0.3s ease-out forwards;
+}
+
+.veil-open .veil-led {
+  animation: veil-led 0.3s ease-out forwards;
+}
+
+/* once the leaves are moving the light is theirs to show, so the crack's own light goes */
+.veil-open .veil-seam {
+  animation: veil-gone 0.6s ease 0.3s forwards;
+}
+
+.veil-open .veil-status,
+.veil-open .veil-plate {
+  animation: veil-gone 0.3s ease forwards;
+}
+
+@keyframes veil-flare {
+  from {
+    transform: scaleX(1);
+  }
+  to {
+    transform: scaleX(2.6);
+  }
+}
+
+@keyframes veil-glow-flare {
+  from {
+    opacity: 1;
+    transform: scaleX(1);
+  }
+  to {
+    opacity: 1;
+    transform: scaleX(3);
+  }
+}
+
+@keyframes veil-led {
+  from {
+    opacity: 0.7;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes veil-gone {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+.museum-canvas-fixed {
+  opacity: 0;
+  transition: opacity 1.4s cubic-bezier(0.76, 0, 0.24, 1) 0.3s;
+}
+
+.museum-canvas-fixed.is-lit {
+  opacity: 1;
+}
+
+/* ------------------------------------------------------------------ */
+/* Phones                                                              */
+/* ------------------------------------------------------------------ */
+
+@media (max-width: 560px) {
+  .veil {
+    --name-gap: 28px;
+    --pull: 10px;
+  }
+  .veil-plate {
+    padding: 7px 12px;
+    font-size: 11px;
+  }
+  .veil-hud {
+    top: 20px;
+  }
+  .veil-panel-left .veil-hud {
+    left: 20px;
+  }
+  .veil-panel-right .veil-hud {
+    right: 20px;
+  }
+  /* the sound link takes the other corner, so the number stacks over its caption */
+  .veil-status {
+    left: 20px;
+    bottom: 24px;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+  .veil-num {
+    font-size: 48px;
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* Reduced motion: nothing draws, rises, sweeps, flares or slides -     */
+/* it is all simply there, and the screen crossfades                   */
+/* ------------------------------------------------------------------ */
+
+@media (prefers-reduced-motion: reduce) {
+  .veil-word,
+  .veil-word-last {
+    transform: none;
+    animation: veil-fade 0.4s ease both;
+  }
+  .veil-hair,
+  .veil-arch path,
+  .veil-band,
+  .veil-pull,
+  .veil-hud,
+  .veil-plate,
+  .veil-status {
+    animation: veil-fade 0.4s ease both;
+    animation-delay: 0s;
+  }
+  .veil-arch path {
+    stroke-dashoffset: 0;
+    animation: none;
+  }
+  .veil-seam {
+    animation: none;
+  }
+  .veil {
+    transition: opacity 0.4s ease;
+  }
+  .veil-open {
+    opacity: 0;
+  }
+  .veil-panel,
+  .veil-open .veil-panel {
+    transition: none;
+  }
+  .veil-open .veil-panel-left,
+  .veil-open .veil-panel-right {
+    transform: none;
+  }
+  .veil-open .veil-gap,
+  .veil-open .veil-glow,
+  .veil-open .veil-led,
+  .veil-open .veil-seam,
+  .veil-open .veil-status,
+  .veil-open .veil-plate {
+    animation: none;
+  }
+  .museum-canvas-fixed {
+    transition: opacity 0.4s ease;
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* The sound switch                                                    */
+/* ------------------------------------------------------------------ */
+
+/*
+  A line of small type, not a button: no box, no icon. It stands above the
+  loading screen (40) so it is there from the first moment, and carries on
+  into the hall in the same corner.
+*/
+.sound-toggle {
+  position: fixed;
+  right: 32px;
+  bottom: 32px;
+  z-index: 41;
+  margin: -10px -8px;
+  padding: 10px 8px;
+  background: none;
+  border: 0;
+  font-family: var(--font-plex-mono), ui-monospace, "SFMono-Regular", Menlo, monospace;
+  font-size: 11px;
+  font-weight: 400;
+  line-height: 1;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #b89a72;
+  opacity: 0.75;
+  text-decoration: underline;
+  text-decoration-color: transparent;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 6px;
+  cursor: pointer;
+  transition: opacity 0.2s ease, text-decoration-color 0.2s ease;
+}
+
+.sound-toggle.is-on {
+  opacity: 0.85;
+}
+
+.sound-toggle:hover,
+.sound-toggle:focus-visible {
+  opacity: 1;
+  text-decoration-color: #5ad1d6;
+}
+
+.sound-toggle:focus-visible {
+  outline: 1px solid rgba(90, 209, 214, 0.6);
+  outline-offset: 2px;
+}
+
+/* on the ordinary pages the category bar lives at the bottom */
+.sound-toggle.is-page {
+  right: 22px;
+  bottom: 96px;
+}
+
+@media (max-width: 560px) {
+  .sound-toggle {
+    right: 20px;
+    bottom: 28px;
+  }
+  .sound-toggle.is-page {
+    right: 14px;
+    bottom: 88px;
+  }
+}

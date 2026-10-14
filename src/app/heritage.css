@@ -1,0 +1,648 @@
+/*
+  Heritage: the museum's overlays, set by hand.
+
+  The catalogue cards, and the small pieces of interface around the
+  rooms, all draw on one set of materials: aged
+  vellum, tooled leather, antique brass, ink and wax. Brown, not black -
+  a room lit by lamps and made of wood and paper, which is warmer and
+  lower in contrast than a screen's idea of dark.
+
+  The ornament comes from heritage-assets.css as custom properties
+  (corners, a flourish, paper grain and fibre), generated from one vine
+  so every piece is plainly by one hand. The loading screen is not part
+  of this: it is loader.css, and deliberately plain.
+
+  Typefaces, all set up in layout.tsx:
+    --font-pica     titles           (a 1670s roman, ink-bled and uneven)
+    --font-fell     reading text     (the same family, text size)
+    --font-fell-sc  labels           (true small capitals)
+    --font-hand     margin notes     (an informal pen, used for nothing else)
+*/
+
+.museum-placards,
+.museum-hud,
+.museum-tip,
+.museum-skip {
+  --h-leather: #2b1b10;
+  --h-walnut: #3d2918;
+  --h-tan: #8a6a44;
+  --h-brass: #b8935a;
+  --h-brass-hi: #dcc08a;
+  --h-paper: #e8d6b0;
+  --h-paper-dim: #cdb78f;
+  --h-stitch: rgba(220, 192, 138, 0.42);
+}
+
+/* ------------------------------------------------------------------ */
+/* The catalogue card                                                  */
+/* ------------------------------------------------------------------ */
+
+/*
+  Aged vellum in lamplight. Under the text, from the bottom up: the
+  paper itself; a burnt darkening toward the edges where old paper has
+  been handled; a few foxing stains, the rust-brown blotches that
+  moisture leaves; laid fibres and surface tooth; four dashed lines of
+  stitching, as on a leather binding; and a vine curling out of each
+  corner. All of it is background, because the card scrolls and
+  backgrounds stay fixed to its edge where children would scroll away.
+*/
+.museum-placards .museum-exhibit-card.is-active {
+  width: min(500px, calc(100% - 28px));
+  max-height: min(80vh, 720px);
+  padding: 44px 46px 0;
+  border: 1px solid rgba(200, 148, 74, 0.42);
+  border-radius: 1px;
+  outline: 1px solid rgba(200, 148, 74, 0.16);
+  outline-offset: -9px;
+  color: var(--h-paper);
+  font-family: var(--font-fell), "IM Fell English", Georgia, serif;
+  /*
+    The one futuristic note: the board is very slightly glass. The hall
+    shows through it faintly, softened, and a fine line of light runs along
+    its top edge. Everything on it is still vellum, leather and ink.
+  */
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+  /*
+    A lamplit brown, slightly glass: the same warm stone-and-leather tone as
+    the hall's walls in their own light, so the card reads as part of the
+    building rather than a black panel laid over it. The heritage is all
+    still on it - the stitching, a vine in each corner, the stamp, the
+    swash, the wax seal. Over it, a light futuristic touch: gold L-ticks at
+    the four corners, a barely-there drafting grid, and one short cyan line
+    at the head, like a status light.
+  */
+  background:
+    linear-gradient(#c8944a, #c8944a) top 5px left 5px / 16px 1px no-repeat,
+    linear-gradient(#c8944a, #c8944a) top 5px left 5px / 1px 16px no-repeat,
+    linear-gradient(#c8944a, #c8944a) top 5px right 5px / 16px 1px no-repeat,
+    linear-gradient(#c8944a, #c8944a) top 5px right 5px / 1px 16px no-repeat,
+    linear-gradient(#c8944a, #c8944a) bottom 5px left 5px / 16px 1px no-repeat,
+    linear-gradient(#c8944a, #c8944a) bottom 5px left 5px / 1px 16px no-repeat,
+    linear-gradient(#c8944a, #c8944a) bottom 5px right 5px / 16px 1px no-repeat,
+    linear-gradient(#c8944a, #c8944a) bottom 5px right 5px / 1px 16px no-repeat,
+    linear-gradient(90deg, rgba(90, 209, 214, 0), rgba(90, 209, 214, 0.85) 50%, rgba(90, 209, 214, 0)) top 0 center / 84px 1px no-repeat,
+    var(--h-corner-tl) top 11px left 11px / 112px 112px no-repeat,
+    var(--h-corner-tr) top 11px right 11px / 112px 112px no-repeat,
+    var(--h-corner-br) bottom 11px right 11px / 112px 112px no-repeat,
+    var(--h-corner-bl) bottom 11px left 11px / 112px 112px no-repeat,
+    repeating-linear-gradient(90deg, var(--h-stitch) 0 6px, transparent 6px 12px) top 19px left 19px / calc(100% - 38px) 1px no-repeat,
+    repeating-linear-gradient(90deg, var(--h-stitch) 0 6px, transparent 6px 12px) bottom 19px left 19px / calc(100% - 38px) 1px no-repeat,
+    repeating-linear-gradient(180deg, var(--h-stitch) 0 6px, transparent 6px 12px) top 19px left 19px / 1px calc(100% - 38px) no-repeat,
+    repeating-linear-gradient(180deg, var(--h-stitch) 0 6px, transparent 6px 12px) top 19px right 19px / 1px calc(100% - 38px) no-repeat,
+    repeating-linear-gradient(0deg, rgba(200, 148, 74, 0.028) 0 1px, transparent 1px 28px),
+    repeating-linear-gradient(90deg, rgba(200, 148, 74, 0.028) 0 1px, transparent 1px 28px),
+    var(--h-fibre) 0 0 / 300px 300px repeat,
+    var(--h-grain) 0 0 / 240px 240px repeat,
+    radial-gradient(125% 92% at 50% 42%, transparent 52%, rgba(16, 9, 4, 0.5) 100%),
+    linear-gradient(172deg, rgba(62, 45, 30, 0.93) 0%, rgba(50, 36, 24, 0.94) 55%, rgba(41, 29, 19, 0.95) 100%);
+  box-shadow:
+    0 30px 80px rgba(0, 0, 0, 0.7),
+    inset 0 1px 0 rgba(232, 197, 101, 0.22),
+    inset 0 0 60px rgba(14, 7, 3, 0.55);
+  scrollbar-width: thin;
+  scrollbar-color: rgba(184, 147, 90, 0.4) transparent;
+  animation: heritage-in 0.5s ease;
+}
+
+@keyframes heritage-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -48.5%) rotate(-0.6deg);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, -50%) rotate(0deg);
+  }
+}
+
+/*
+  The catalogue number, pressed in the top centre like a library stamp.
+  Oxblood ink at less than full strength, because a stamp never prints
+  solid, and turned a few degrees, because nobody sets one square.
+*/
+.museum-placards .cat-stamp {
+  display: block;
+  width: 66px;
+  height: 66px;
+  margin: 0 auto 6px;
+  color: #c4583d;
+  opacity: 0.82;
+  transform: rotate(-7deg);
+  pointer-events: none;
+}
+
+.museum-placards .museum-exhibit-card h2 {
+  margin: 0;
+  text-align: center;
+  font-family: var(--font-pica), "IM Fell DW Pica", Georgia, serif;
+  font-size: 41px;
+  font-weight: 400;
+  line-height: 1.1;
+  letter-spacing: 0.01em;
+  /* gold leaf, a band per line, set into the board by a hairline shadow - no glow */
+  color: #c9974f;
+  background: var(--text-gold) 0 0 / 100% 1.1em repeat-y;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  filter: drop-shadow(0 1px 0 rgba(0, 0, 0, 0.6)) drop-shadow(0 -1px 0 rgba(255, 235, 190, 0.12));
+}
+
+.museum-placards .museum-exhibit-card .museum-placard-meta {
+  margin: 8px 0 0;
+  text-align: center;
+  font-family: var(--font-fell), Georgia, serif;
+  font-style: italic;
+  font-size: 17px;
+  letter-spacing: 0;
+  text-transform: none;
+  color: #cfa96d;
+}
+
+/* a flourish that a nib would leave, thick in the middle, a hook at each end */
+.museum-placards .cat-rule {
+  height: 34px;
+  margin: 2px -6px 0;
+  background: var(--h-swash) center / 300px 34px no-repeat;
+}
+
+.museum-placards .museum-exhibit-card .museum-placard-copy {
+  margin: 0;
+  font-family: var(--font-fell), Georgia, serif;
+  font-size: 19px;
+  line-height: 1.62;
+  color: var(--text-primary);
+  hyphens: auto;
+  /*
+    Holds the illuminated letter inside the paragraph. It floats, and a
+    float taller than a one-line paragraph hung out below it - so whatever
+    came next (the links) was laid out beside the letter, off centre.
+  */
+  display: flow-root;
+}
+
+/*
+  A line or two of text gets no illuminated letter: a capital that tall
+  next to a single short line splits the first word in two ("H is first
+  phone."). It is set centred instead, under the centred title.
+*/
+.museum-placards .museum-exhibit-card .museum-placard-copy.is-short {
+  text-align: center;
+}
+
+.museum-placards .museum-exhibit-card .museum-placard-copy.is-short::first-letter {
+  float: none;
+  margin: 0;
+  padding: 0;
+  font: inherit;
+  line-height: inherit;
+  color: inherit;
+  background: none;
+  border: 0;
+  box-shadow: none;
+  text-shadow: none;
+}
+
+/*
+  The first letter, illuminated: gold on a small oxblood panel, with a
+  fine inner rule. In a manuscript this is where the scribe's best work
+  went, and it is the quickest way to make a block of text read as
+  something written rather than something displayed.
+*/
+.museum-placards .museum-exhibit-card .museum-placard-copy::first-letter {
+  float: left;
+  margin: 6px 12px 0 0;
+  padding: 5px 9px 1px;
+  font-family: var(--font-pica), Georgia, serif;
+  font-size: 3.45em;
+  line-height: 0.86;
+  color: #ebcf91;
+  background: linear-gradient(160deg, #7d2e20, #4c180f);
+  border: 1px solid #b8935a;
+  box-shadow:
+    inset 0 0 0 2px rgba(0, 0, 0, 0.28),
+    inset 0 0 0 3px rgba(184, 147, 90, 0.35);
+  text-shadow: 0 1px 0 #000;
+}
+
+.museum-placards .museum-exhibit-card .museum-placard-list {
+  margin: 16px 0 0;
+  padding-left: 28px;
+  list-style: lower-roman;
+  font-family: var(--font-fell), Georgia, serif;
+  font-size: 18px;
+  line-height: 1.5;
+  color: var(--h-paper-dim);
+}
+
+.museum-placards .museum-exhibit-card .museum-placard-list li {
+  margin: 5px 0;
+  padding-left: 6px;
+}
+
+.museum-placards .museum-exhibit-card .museum-placard-list li::marker {
+  color: var(--h-brass);
+  font-style: italic;
+}
+
+.museum-placards .museum-exhibit-card .museum-contact-links {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 4px 26px;
+  margin-top: 22px;
+  font-family: var(--font-fell-sc), Georgia, serif;
+  font-size: 16px;
+  letter-spacing: 0.16em;
+  text-transform: none;
+}
+
+.museum-placards .museum-exhibit-card .museum-contact-links a {
+  padding: 2px 1px 3px;
+  color: var(--h-brass-hi);
+  opacity: 0.72;
+  border: 0;
+  text-decoration: none;
+  background: linear-gradient(#5ad1d6, #5ad1d6) left bottom / 0 1px no-repeat;
+  transition: background-size 0.3s ease, opacity 0.3s ease;
+}
+
+.museum-placards .museum-exhibit-card .museum-contact-links a:hover,
+.museum-placards .museum-exhibit-card .museum-contact-links a:focus-visible {
+  opacity: 1;
+  background-size: 100% 1px;
+}
+
+.museum-placards .museum-exhibit-card .museum-contact-links a:focus-visible,
+.museum-placards .museum-exhibit-card .museum-close:focus-visible {
+  outline: 1px solid rgba(90, 209, 214, 0.7);
+  outline-offset: 4px;
+}
+
+/* ------------------------------------------------------------------ */
+/* Tools, as specimen plates                                           */
+/* ------------------------------------------------------------------ */
+
+/*
+  Small leather plates with stitched edges and a brass stud in two
+  corners, each with the tool's mark above its name. Warm brass at rest,
+  and the brand's own colour only when you rest on one.
+*/
+.museum-placards .tool-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(112px, 1fr));
+  gap: 12px;
+  margin: 20px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.museum-placards .tool-box {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 19px 8px 14px;
+  border: 1px solid #8a6a44;
+  outline: 1px dashed var(--h-stitch);
+  outline-offset: -5px;
+  background: linear-gradient(180deg, rgba(96, 66, 40, 0.72), rgba(60, 41, 26, 0.72));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 225, 170, 0.14),
+    0 2px 5px rgba(0, 0, 0, 0.4);
+  transition: transform 0.25s ease, border-color 0.25s ease, background-color 0.25s ease;
+}
+
+.museum-placards .tool-box::before,
+.museum-placards .tool-box::after {
+  content: "";
+  position: absolute;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 36% 30%, #f0d8a0, #8a6a30 72%);
+  box-shadow: 0 1px 1px rgba(0, 0, 0, 0.6);
+}
+
+.museum-placards .tool-box::before {
+  top: 6px;
+  left: 6px;
+}
+
+.museum-placards .tool-box::after {
+  right: 6px;
+  bottom: 6px;
+}
+
+.museum-placards .tool-mark {
+  width: 34px;
+  height: 34px;
+  color: #dcbf86;
+  transition: color 0.25s ease, filter 0.25s ease;
+}
+
+.museum-placards .tool-name {
+  max-width: 100%;
+  text-align: center;
+  font-family: var(--font-fell), Georgia, serif;
+  font-size: 15.5px;
+  line-height: 1.15;
+  color: var(--h-paper);
+  overflow-wrap: anywhere;
+}
+
+.museum-placards .tool-box:hover {
+  transform: translateY(-2px);
+  border-color: #b8935a;
+}
+
+.museum-placards .tool-box:hover .tool-mark {
+  color: var(--brand, #f3e1b4);
+  filter: drop-shadow(0 0 7px color-mix(in srgb, var(--brand, #c9a227) 55%, transparent));
+}
+
+/* ------------------------------------------------------------------ */
+/* The end of a card: two leather tabs, a note, a signature, a seal    */
+/* ------------------------------------------------------------------ */
+
+/*
+  Live website and Code, pinned to the foot of the card so they are in
+  view however much has been read. Each is a leather tab with stitched
+  edges. A destination that is not public stays in the row, faded and
+  inert, so every project shows the same two options.
+*/
+.museum-placards .cat-actions {
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin: 14px -46px 0;
+  padding: 36px 46px 16px;
+  /* solid by 14px, so text scrolling past never shows through behind the note */
+  background: linear-gradient(180deg, rgba(41, 29, 19, 0) 0, rgb(41, 29, 19) 14px);
+}
+
+.museum-placards .cat-action {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  padding: 13px 10px 12px;
+  font-family: var(--font-fell-sc), Georgia, serif;
+  font-size: 16px;
+  letter-spacing: 0.14em;
+  text-decoration: none;
+  color: var(--text-primary);
+  background: linear-gradient(180deg, #5c3d26, #45301f);
+  border: 1px solid #8a6a44;
+  border-radius: 2px;
+  outline: 1px dashed var(--h-stitch);
+  outline-offset: -5px;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 225, 170, 0.18),
+    0 2px 5px rgba(0, 0, 0, 0.45);
+  transition: background 0.25s ease, color 0.25s ease, border-color 0.25s ease;
+}
+
+.museum-placards .cat-action svg {
+  width: 11px;
+  height: 11px;
+  flex: none;
+  transition: transform 0.25s ease;
+}
+
+.museum-placards a.cat-action:hover {
+  color: #e8dcc4;
+  border-color: #b8935a;
+  background: linear-gradient(180deg, #6e4a2e, #523922);
+}
+
+.museum-placards a.cat-action:hover svg {
+  transform: translate(1.5px, -1.5px);
+}
+
+.museum-placards .cat-action.is-off {
+  color: rgba(205, 183, 143, 0.4);
+  background: rgba(60, 41, 26, 0.35);
+  border-color: rgba(138, 106, 68, 0.35);
+  outline-color: rgba(220, 192, 138, 0.16);
+  box-shadow: none;
+  cursor: default;
+}
+
+/* a note in the margin, with an arrow drawn by hand */
+.museum-placards .cat-note {
+  position: absolute;
+  top: 15px;
+  left: 54px;
+  display: flex;
+  align-items: flex-end;
+  gap: 4px;
+  font-family: var(--font-hand), cursive;
+  font-size: 21px;
+  line-height: 1;
+  color: #cfa869;
+  transform: rotate(-3deg);
+  pointer-events: none;
+}
+
+.museum-placards .cat-note svg {
+  width: 36px;
+  height: 25px;
+  margin-bottom: -10px;
+}
+
+/* a document ends with a seal, centred, and the way back beneath it */
+.museum-placards .cat-end {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 14px 0 22px;
+}
+
+.museum-placards .cat-seal {
+  flex: none;
+  width: 60px;
+  height: 60px;
+  transform: rotate(9deg);
+  filter: drop-shadow(0 3px 4px rgba(0, 0, 0, 0.55));
+}
+
+.museum-placards .museum-exhibit-card .museum-close {
+  margin: 0;
+  /* letter-spacing trails the last letter, so the left pad is wider by that much to centre the word */
+  padding: 8px 12px 8px calc(12px + 0.34em);
+  background: none;
+  border: 0;
+  border-radius: 0;
+  font-family: var(--font-fell-sc), Georgia, serif;
+  font-size: 16px;
+  letter-spacing: 0.34em;
+  text-transform: none;
+  color: var(--h-tan);
+  cursor: pointer;
+  text-decoration: underline;
+  text-decoration-color: transparent;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 6px;
+  transition: color 0.25s ease, text-decoration-color 0.25s ease;
+}
+
+.museum-placards .museum-exhibit-card .museum-close:hover,
+.museum-placards .museum-exhibit-card .museum-close:focus-visible {
+  color: var(--h-brass-hi);
+  text-decoration-color: #5ad1d6;
+}
+
+/* ------------------------------------------------------------------ */
+/* The small interface round the rooms                                 */
+/* ------------------------------------------------------------------ */
+
+/*
+  The room's name in the display face, and the two ways out as small mono
+  type rather than buttons: no box, no leather, an underline that lights
+  cyan under the pointer. Same words as ever.
+*/
+.museum-hud-room {
+  font-family: var(--font-cormorant), "Cormorant Garamond", Georgia, serif;
+  font-size: 30px;
+  font-weight: 400;
+  letter-spacing: 0.01em;
+  text-transform: none;
+  color: var(--text-primary);
+  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.6);
+}
+
+.museum-back,
+.museum-skip {
+  padding: 6px 0;
+  font-family: var(--font-plex-mono), ui-monospace, "SFMono-Regular", Menlo, monospace;
+  font-size: 11px;
+  font-weight: 400;
+  line-height: 1;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #b89a72;
+  opacity: 0.75;
+  background: none;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  outline: none;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  text-decoration: underline;
+  text-decoration-color: transparent;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 6px;
+  transition: opacity 0.2s ease, text-decoration-color 0.2s ease;
+}
+
+.museum-back:hover,
+.museum-back:focus-visible,
+.museum-skip:hover,
+.museum-skip:focus-visible {
+  opacity: 1;
+  color: #b89a72;
+  border-color: transparent;
+  text-decoration-color: #5ad1d6;
+}
+
+.museum-back:focus-visible,
+.museum-skip:focus-visible {
+  outline: 1px solid rgba(90, 209, 214, 0.6);
+  outline-offset: 3px;
+}
+
+/* the hint is something scribbled, not an instruction from an interface */
+.museum-tip {
+  font-family: var(--font-hand), cursive;
+  font-size: 26px;
+  letter-spacing: 0;
+  text-transform: none;
+  color: #d9bb82;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.7);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .museum-placards .museum-exhibit-card.is-active {
+    animation: none;
+  }
+  .museum-placards .tool-box,
+  .museum-placards .tool-mark,
+  .museum-placards .cat-action,
+  .museum-placards .cat-action svg {
+    transition: none;
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* Door plaques: each room's number and name, on its door's keystone. */
+/* Real text in the site's mono, placed in the scene by drei's Html.  */
+/* ------------------------------------------------------------------ */
+.door-plaque {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  width: 150px;
+  padding: 7px 0;
+  box-sizing: border-box;
+  border: 1px solid rgba(200, 148, 74, 0.7);
+  /* dark bronze glass */
+  background: linear-gradient(180deg, rgba(34, 25, 17, 0.92), rgba(16, 11, 7, 0.94));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 228, 180, 0.08),
+    0 2px 6px rgba(0, 0, 0, 0.5);
+  font-family: var(--font-plex-mono), ui-monospace, monospace;
+  font-size: 11px;
+  line-height: 1;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  color: #b89a72;
+  pointer-events: none;
+  user-select: none;
+  transition:
+    opacity 0.4s ease,
+    color 0.3s ease,
+    border-color 0.3s ease,
+    background 0.3s ease;
+}
+
+.door-plaque-dot {
+  flex: none;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #5ad1d6;
+  box-shadow: 0 0 4px rgba(90, 209, 214, 0.8);
+}
+
+/* the door under the pointer, or the one you are in */
+.door-plaque.is-lit {
+  color: #e8dcc4;
+  border-color: rgba(230, 194, 122, 0.95);
+  background: linear-gradient(180deg, rgba(52, 38, 25, 0.94), rgba(24, 17, 11, 0.95));
+}
+
+.door-plaque.is-lit .door-plaque-dot {
+  box-shadow: 0 0 7px rgba(90, 209, 214, 1);
+}
+
+/* out of the hall, the plaques would show through the walls of a room */
+.door-plaque.is-away {
+  opacity: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .door-plaque {
+    transition: none;
+  }
+}

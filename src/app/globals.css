@@ -15,7 +15,16 @@
 :root {
   --bg: #16100a;
   --surface: #1e1710;
-  --text: #f4e8d4;
+  /*
+    Text, three ways and no others. Never pure white or bright cream: a
+    soft ivory for reading, a muted tan for labels, and gold leaf for the
+    few headings that should feel carved. --text is the ivory, so every
+    rule that already asks for it gets it.
+  */
+  --text-primary: rgba(232, 220, 196, 0.9);
+  --text-muted: rgba(184, 154, 114, 0.75);
+  --text-gold: linear-gradient(180deg, #a8742f 0%, #e6c27a 50%, #a8742f 100%);
+  --text: var(--text-primary);
   --muted: #a3907a;
   --faint: #4a3d2e;
   --accent: #ffb63f;
@@ -249,6 +258,8 @@ a {
 .museum-stop {
   position: relative;
   z-index: 1;
+  /* it holds only screen-reader text now, and must not catch clicks meant for the scene behind it */
+  pointer-events: none;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -943,7 +954,7 @@ a {
   gap: 8px;
   width: min(560px, calc(100% - 28px));
   background: var(--accent);
-  color: #fff;
+  color: var(--text-primary);
   border-radius: 999px;
   padding: 14px 28px;
   box-shadow: none;
@@ -1115,159 +1126,6 @@ a {
 }
 
 /* ------------------------------------------------------------------ */
-/* Loading veil                                                        */
-/* ------------------------------------------------------------------ */
-
-.veil {
-  position: fixed;
-  inset: 0;
-  z-index: 40;
-  display: grid;
-  place-items: center;
-  background:
-    radial-gradient(120% 90% at 50% 45%, #241a10 0%, #140e08 55%, #0b0705 100%);
-  transition: opacity 0.6s ease;
-}
-
-/* the sweep of light that crosses the veil, as the corridor coves do */
-.veil::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(
-    100deg,
-    transparent 38%,
-    rgba(255, 198, 112, 0.055) 50%,
-    transparent 62%
-  );
-  background-size: 260% 100%;
-  animation: veil-sweep 3.4s ease-in-out infinite;
-  pointer-events: none;
-}
-
-.veil-out {
-  opacity: 0;
-  pointer-events: none;
-}
-
-.veil-inner {
-  position: relative;
-  z-index: 1;
-  width: min(420px, calc(100% - 48px));
-  text-align: center;
-}
-
-.veil-eyebrow {
-  color: var(--museum-gold, #f0b45f);
-  font-size: 11.5px;
-  letter-spacing: 0.26em;
-  text-transform: uppercase;
-  font-weight: 600;
-  margin: 0;
-  opacity: 0.85;
-}
-
-.veil-name {
-  margin: 12px 0 30px;
-  font-size: 40px;
-  letter-spacing: -0.02em;
-  color: #f6e7cd;
-  /* the same hot-core-with-warm-halo the 3D emissives use */
-  text-shadow:
-    0 0 1px rgba(255, 243, 212, 0.9),
-    0 0 22px rgba(255, 182, 63, 0.35);
-}
-
-.veil-track {
-  position: relative;
-  height: 2px;
-  width: 100%;
-  background: rgba(255, 224, 174, 0.12);
-  overflow: hidden;
-}
-
-/*
-  The creep is a keyframe, not a state update. It decelerates toward 88%
-  and waits there, so the bar is always moving while assets load without
-  React re-rendering sixty times a second on the busiest thread in the
-  page.
-*/
-.veil-fill {
-  display: block;
-  height: 100%;
-  width: 0;
-  background: linear-gradient(90deg, #8a6a34, #ffe0ae 60%, #fff3d4);
-  box-shadow: 0 0 12px rgba(255, 182, 63, 0.55);
-  animation: veil-creep 7s cubic-bezier(0.14, 0.86, 0.2, 1) forwards;
-  transition: width 0.5s cubic-bezier(0.22, 1, 0.36, 1);
-}
-
-.veil-fill-done {
-  /* overrides the keyframe end state and runs the transition to full */
-  animation: none;
-  width: 100%;
-}
-
-@keyframes veil-creep {
-  0% {
-    width: 0;
-  }
-  100% {
-    width: 88%;
-  }
-}
-
-.veil-status {
-  margin: 18px 0 0;
-  color: rgba(246, 231, 205, 0.5);
-  font-size: 12px;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-}
-
-/* three dots that fill in turn, without shifting the text */
-.veil-dots::after {
-  content: "";
-  animation: veil-dots 1.6s steps(1, end) infinite;
-}
-
-@keyframes veil-sweep {
-  0% {
-    background-position: 130% 0;
-  }
-  100% {
-    background-position: -130% 0;
-  }
-}
-
-@keyframes veil-dots {
-  0% {
-    content: "";
-  }
-  25% {
-    content: ".";
-  }
-  50% {
-    content: "..";
-  }
-  75% {
-    content: "...";
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .veil::after,
-  .veil-dots::after {
-    animation: none;
-  }
-  .veil-fill {
-    animation: none;
-    width: 70%;
-  }
-}
-
-
-/* ------------------------------------------------------------------ */
 /* Exhibit overlay — the same glow language as the 3D emissives        */
 /* ------------------------------------------------------------------ */
 
@@ -1297,7 +1155,7 @@ a {
 }
 
 .museum-exhibit-card h2 {
-  color: var(--core);
+  color: var(--text-primary);
   text-shadow:
     0 0 1px rgba(255, 243, 212, 0.8),
     0 0 20px rgba(255, 182, 63, 0.3);
@@ -1325,7 +1183,7 @@ a {
 }
 
 .museum-exhibit-card .museum-contact-links a:hover {
-  color: var(--core);
+  color: var(--text-primary);
   border-bottom-color: var(--accent);
 }
 
@@ -1343,5 +1201,5 @@ a {
 
 .museum-close:hover {
   border-color: var(--accent);
-  color: var(--core);
+  color: var(--text-primary);
 }
