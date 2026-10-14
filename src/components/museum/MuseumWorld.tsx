@@ -9,6 +9,10 @@ import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { doors, type RoomId } from "./corridorLayout";
 import { allExhibits, type ExhibitDatum } from "./exhibitData";
 import { hasWebGL } from "./webgl";
+import { markDoorClick } from "./clickTrace";
+import { hasDebugFlag } from "./debug";
+import { ToolBox } from "./ToolBox";
+import { CatalogueStamp, HeritageDefs, WaxSeal } from "./Heritage";
 import { LoadingVeil } from "./LoadingVeil";
 import { site } from "@/content/site";
 
@@ -28,7 +32,25 @@ const STAGES = [
   { id: "hall-2", vh: 240 },
   { id: "hall-3", vh: 240 },
   { id: "hall-4", vh: 240 },
+  { id: "hall-5", vh: 240 },
 ];
+
+/** Catalogue numbers, the way a collection numbers its holdings. */
+function toRoman(n: number) {
+  const table: [number, string][] = [
+    [1000, "M"], [900, "CM"], [500, "D"], [400, "CD"], [100, "C"], [90, "XC"],
+    [50, "L"], [40, "XL"], [10, "X"], [9, "IX"], [5, "V"], [4, "IV"], [1, "I"],
+  ];
+  let out = "";
+  let rest = n;
+  for (const [value, glyph] of table) {
+    while (rest >= value) {
+      out += glyph;
+      rest -= value;
+    }
+  }
+  return out;
+}
 
 export function MuseumWorld() {
   const rootRef = useRef<HTMLDivElement>(null);
@@ -38,6 +60,8 @@ export function MuseumWorld() {
   const [active, setActive] = useState<ExhibitDatum | null>(null);
   const [webgl, setWebgl] = useState<boolean | null>(null);
   const [loaded, setLoaded] = useState(false);
+  /* the doors have started to part: the hall's light comes up behind them */
+  const [lit, setLit] = useState(false);
   /*
     Set by the canvas once the hall is built, compiled and drawn. The
     files being downloaded is not the same thing: the rooms are built
@@ -140,7 +164,27 @@ export function MuseumWorld() {
     return () => window.removeEventListener("keydown", onKey);
   }, [active, room]);
 
+  /*
+    A click anywhere off the open card puts it away, the same as Return.
+    Clicks on the 3D scene are left to the canvas: one that lands on
+    another exhibit opens that one instead, and one that lands on nothing
+    comes back through onMissed below.
+  */
+  useEffect(() => {
+    if (!active) return;
+    const onClick = (e: MouseEvent) => {
+      const target = e.target as Element | null;
+      if (!target || target.closest(".museum-exhibit-card.is-active, canvas")) return;
+      setActive(null);
+    };
+    document.addEventListener("click", onClick);
+    return () => document.removeEventListener("click", onClick);
+  }, [active]);
+
+  const handleMissed = useCallback(() => setActive(null), []);
+
   const handleReady = useCallback(() => setPainted(true), []);
+  const handleOpen = useCallback(() => setLit(true), []);
 
   /*
     A cap on the whole thing. Whatever goes wrong — a driver that never
@@ -154,14 +198,32 @@ export function MuseumWorld() {
   }, [painted, webgl]);
 
   const enterRoom = useCallback((id: RoomId) => {
+    markDoorClick(id);
     setActive(null);
     setRoom(id);
   }, []);
 
+  /*
+    With ?debug on the address, rooms can be entered from the console
+    (window.__enterRoom("projects")). Checking a room's look in a headless
+    browser otherwise means hitting a door in a WebGL scene by pixel.
+    Visitors never have it.
+  */
   const leaveRoom = useCallback(() => {
     setActive(null);
     setRoom(null);
   }, []);
+
+  useEffect(() => {
+    if (!hasDebugFlag()) return;
+    const w = window as unknown as { __enterRoom?: (id: RoomId) => void; __leaveRoom?: () => void };
+    w.__enterRoom = enterRoom;
+    w.__leaveRoom = leaveRoom;
+    return () => {
+      delete w.__enterRoom;
+      delete w.__leaveRoom;
+    };
+  }, [enterRoom, leaveRoom]);
 
   const handleSelect = useCallback((exhibit: ExhibitDatum) => {
     setActive((current) => (current?.id === exhibit.id ? null : exhibit));
@@ -170,112 +232,198 @@ export function MuseumWorld() {
   const roomLabel = doors.find((d) => d.id === room)?.label ?? "";
 
   return (
-    <div ref={rootRef} className={`museum-root${ready ? " ready" : ""}`}>
-      <LoadingVeil ready={loaded && (painted || webgl === false)} />
+    <>
+      {/*
+        Outside .museum-root on purpose. That element is invisible until the page has
+        hydrated, and a loading screen that waits for the scripts it is covering for
+        shows nothing at all on exactly the connections that need it.
+      */}
+      <LoadingVeil
+        ready={loaded && (painted || webgl === false)}
+        assetsDone={loaded}
+        onOpen={handleOpen}
+      />
 
-      <div className="museum-canvas-fixed">
-        {webgl ? (
-          <MuseumCanvas
-            onReady={handleReady}
-            progressRef={progressRef}
-            roomId={room}
-            onEnterRoom={enterRoom}
-            activeId={active?.id ?? null}
-            onSelect={handleSelect}
-          />
+      <div ref={rootRef} className={`museum-root${ready ? " ready" : ""}`}>
+        <HeritageDefs />
+
+        <div className={`museum-canvas-fixed${lit ? " is-lit" : ""}`}>
+          {webgl ? (
+            <MuseumCanvas
+              onReady={handleReady}
+              progressRef={progressRef}
+              roomId={room}
+              onEnterRoom={enterRoom}
+              activeId={active?.id ?? null}
+              onSelect={handleSelect}
+              onMissed={handleMissed}
+            />
+          ) : null}
+        </div>
+
+        {webgl === false ? (
+          <div className="museum-nowebgl">
+            <p>This browser can&rsquo;t run the 3D museum (WebGL is unavailable).</p>
+            <Link href="/profile">View the full portfolio instead →</Link>
+          </div>
         ) : null}
-      </div>
 
-      {webgl === false ? (
-        <div className="museum-nowebgl">
-          <p>This browser can&rsquo;t run the 3D museum (WebGL is unavailable).</p>
-          <Link href="/profile">View the full portfolio instead →</Link>
-        </div>
-      ) : null}
+        {/*
+          The entrance card is gone, but this section stays: it is the first
+          leg of the scroll track that drives the camera, and it carries the
+          page's only <h1>. The heading is kept for screen readers and
+          crawlers rather than deleted outright.
+        */}
+        <section id="entrance" className="museum-stop" style={{ minHeight: `${STAGES[0].vh}vh` }}>
+          <h1 className="sr-only">{site.name}</h1>
+          <p className="sr-only">{site.role}</p>
+        </section>
 
-      <Link href="/profile" className="museum-skip">
-        Skip 3D →
-      </Link>
+        {STAGES.slice(1).map((stage) => (
+          <section
+            key={stage.id}
+            id={stage.id}
+            aria-hidden="true"
+            className="museum-spacer"
+            style={{ minHeight: `${stage.vh}vh` }}
+          />
+        ))}
 
-      {/*
-        The entrance card is gone, but this section stays: it is the first
-        leg of the scroll track that drives the camera, and it carries the
-        page's only <h1>. The heading is kept for screen readers and
-        crawlers rather than deleted outright.
-      */}
-      <section id="entrance" className="museum-stop" style={{ minHeight: `${STAGES[0].vh}vh` }}>
-        <h1 className="sr-only">{site.name}</h1>
-        <p className="sr-only">{site.role}</p>
-      </section>
+        {room ? (
+          <div className="museum-hud">
+            <span className="museum-hud-room">{roomLabel}</span>
+            <button type="button" className="museum-back" onClick={leaveRoom}>
+              ← Back to corridor
+            </button>
+          </div>
+        ) : (
+          <p className={`museum-tip${active ? " hidden" : ""}`}>Click a door to enter a room</p>
+        )}
 
-      {STAGES.slice(1).map((stage) => (
-        <section
-          key={stage.id}
-          id={stage.id}
-          aria-hidden="true"
-          className="museum-spacer"
-          style={{ minHeight: `${stage.vh}vh` }}
-        />
-      ))}
+        {/*
+          Placards stay in the DOM so they remain crawlable and
+          screen-reader reachable; only the selected one is presented.
+        */}
+        <div className="museum-placards">
+          {allExhibits.map((exhibit, i) => {
+            const isActive = active?.id === exhibit.id;
+            return (
+              <article
+                key={exhibit.id}
+                className={`museum-exhibit-card${isActive ? " is-active" : ""}`}
+                aria-hidden={isActive ? undefined : "true"}
+              >
+                {/*
+                  A page from a catalogue, made by someone.
 
-      {room ? (
-        <div className="museum-hud">
-          <span className="museum-hud-room">{roomLabel}</span>
-          <button type="button" className="museum-back" onClick={leaveRoom}>
-            ← Back to corridor
-          </button>
-        </div>
-      ) : (
-        <p className={`museum-tip${active ? " hidden" : ""}`}>Click a door to enter a room</p>
-      )}
-
-      {/*
-        Placards stay in the DOM so they remain crawlable and
-        screen-reader reachable; only the selected one is presented.
-      */}
-      <div className="museum-placards">
-        {allExhibits.map((exhibit) => {
-          const isActive = active?.id === exhibit.id;
-          return (
-            <article
-              key={exhibit.id}
-              className={`museum-exhibit-card${isActive ? " is-active" : ""}`}
-              aria-hidden={isActive ? undefined : "true"}
-            >
-              <h2>{exhibit.title}</h2>
-              {exhibit.meta ? <p className="museum-placard-meta">{exhibit.meta}</p> : null}
-              {exhibit.body ? <p className="museum-placard-copy">{exhibit.body}</p> : null}
-              {exhibit.bullets?.length ? (
-                <ul className="museum-placard-list">
-                  {exhibit.bullets.map((item) => (
-                    <li key={item}>{item}</li>
-                  ))}
-                </ul>
-              ) : null}
-              {exhibit.links?.length ? (
-                <div className="museum-contact-links">
-                  {exhibit.links.map((link) =>
-                    link.external ? (
-                      <a key={link.href} href={link.href} target="_blank" rel="noreferrer">
-                        {link.label}
-                      </a>
-                    ) : (
-                      <Link key={link.href} href={link.href}>
-                        {link.label}
-                      </Link>
-                    ),
-                  )}
+                  The number is a rubber stamp pressed in the corner and the
+                  divider is a flourish a nib would leave. The first letter
+                  of the text is illuminated. At the foot there is a
+                  signature in a margin hand and a seal in wax. Each of
+                  those is a mark of a person having done it, which is the
+                  one thing an interface card never has.
+                */}
+                <CatalogueStamp numeral={toRoman(i + 1)} />
+                <h2>{exhibit.title}</h2>
+                {exhibit.meta ? <p className="museum-placard-meta">{exhibit.meta}</p> : null}
+                <div className="cat-rule" aria-hidden="true" />
+                {exhibit.body ? (
+                  <p className={`museum-placard-copy${exhibit.body.length < 90 ? " is-short" : ""}`}>
+                    {exhibit.body}
+                  </p>
+                ) : null}
+                {exhibit.tools?.length ? (
+                  <ul className="tool-grid">
+                    {exhibit.tools.map((tool) => (
+                      <ToolBox key={tool} name={tool} />
+                    ))}
+                  </ul>
+                ) : null}
+                {exhibit.bullets?.length ? (
+                  <ol className="museum-placard-list">
+                    {exhibit.bullets.map((item) => (
+                      <li key={item}>{item}</li>
+                    ))}
+                  </ol>
+                ) : null}
+                {exhibit.links?.length ? (
+                  <div className="museum-contact-links">
+                    {exhibit.links.map((link) =>
+                      link.external ? (
+                        <a key={link.href} href={link.href} target="_blank" rel="noreferrer">
+                          {link.label}
+                        </a>
+                      ) : (
+                        <Link key={link.href} href={link.href}>
+                          {link.label}
+                        </Link>
+                      ),
+                    )}
+                  </div>
+                ) : null}
+                {exhibit.actions?.length ? (
+                  <div className="cat-actions">
+                    {/* a note in the margin, with an arrow drawn by hand */}
+                    <span className="cat-note" aria-hidden="true">
+                      have a look
+                      <svg viewBox="0 0 44 30" focusable="false">
+                        <path
+                          d="M3 4 C 12 2, 24 6, 30 18 M 22 17 L 31 20 L 33 10"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="1.7"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                      </svg>
+                    </span>
+                    {exhibit.actions.map((action) =>
+                      action.href ? (
+                        <a
+                          key={action.label}
+                          className="cat-action"
+                          href={action.href}
+                          target="_blank"
+                          rel="noreferrer"
+                        >
+                          {action.label}
+                          <svg viewBox="0 0 12 12" aria-hidden="true" focusable="false">
+                            <path
+                              d="M3 9L9 3M4.5 3H9v4.5"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="1.3"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                            />
+                          </svg>
+                        </a>
+                      ) : (
+                        <span
+                          key={action.label}
+                          className="cat-action is-off"
+                          aria-disabled="true"
+                          title="Not public"
+                        >
+                          {action.label}
+                        </span>
+                      ),
+                    )}
+                  </div>
+                ) : null}
+                <div className="cat-end">
+                  <WaxSeal className="cat-seal" />
+                  {isActive ? (
+                    <button type="button" className="museum-close" onClick={() => setActive(null)}>
+                      Return
+                    </button>
+                  ) : null}
                 </div>
-              ) : null}
-              {isActive ? (
-                <button type="button" className="museum-close" onClick={() => setActive(null)}>
-                  Close
-                </button>
-              ) : null}
-            </article>
-          );
-        })}
+              </article>
+            );
+          })}
+        </div>
       </div>
-    </div>
+    </>
   );
 }
