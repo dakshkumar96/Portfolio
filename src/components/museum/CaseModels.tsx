@@ -110,7 +110,7 @@ const holoFragment = /* glsl */ `
 `;
 
 /** Builds the sheen mesh set for an already-prepared model. */
-function useHoloOverlay(root: THREE.Object3D | null, strength: number) {
+export function useHoloOverlay(root: THREE.Object3D | null, strength: number) {
   const matRef = useRef<THREE.ShaderMaterial | null>(null);
 
   const material = useMemo(
