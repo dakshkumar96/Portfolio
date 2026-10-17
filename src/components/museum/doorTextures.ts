@@ -51,107 +51,6 @@ function seeded(seed: number) {
   };
 }
 
-let walnut: { map: THREE.Texture; normalMap: THREE.Texture; roughnessMap: THREE.Texture } | null = null;
-
-/**
- * Dark walnut, grain running up the leaf.
- *
- * One texture is half a metre wide and two tall at the hall's scale, so
- * the figure repeats rarely enough not to be seen repeating. The grain is
- * fine, and only in the normal and roughness maps as well as the colour,
- * so it catches the light without becoming a pattern.
- */
-export function getWalnut() {
-  if (walnut) return walnut;
-  const W = 256;
-  const H = 1024;
-  const rand = seeded(31);
-  const height = new Float32Array(W * H);
-  const colour = document.createElement("canvas");
-  colour.width = W;
-  colour.height = H;
-  const rough = document.createElement("canvas");
-  rough.width = W;
-  rough.height = H;
-  const cctx = colour.getContext("2d");
-  const rctx = rough.getContext("2d");
-  if (!cctx || !rctx) return null;
-  const cimg = cctx.createImageData(W, H);
-  const rimg = rctx.createImageData(W, H);
-
-  /*
-    The grain is a row of fibres, each its own shade, run up the board
-    and drifting a little sideways as it goes. Irregular spacing is what
-    makes it wood; even spacing made it look like ribbed vinyl.
-  */
-  const fibre = new Float32Array(W);
-  for (let x = 0; x < W; x += 1) fibre[x] = rand();
-  // soften the fibres into each other, a few passes of a three-tap blur, wrapping
-  for (let pass = 0; pass < 2; pass += 1) {
-    const prev = fibre.slice();
-    for (let x = 0; x < W; x += 1) fibre[x] = (prev[(x + W - 1) % W] + prev[x] * 2 + prev[(x + 1) % W]) / 4;
-  }
-  const sample = (u: number) => {
-    const x = ((u % W) + W) % W;
-    const i = Math.floor(x);
-    const f = x - i;
-    return fibre[i] * (1 - f) + fibre[(i + 1) % W] * f;
-  };
-  // a few long dark streaks
-  const streaks = Array.from({ length: 7 }, () => ({ x: rand() * W, w: 1 + rand() * 3, k: 0.3 + rand() * 0.4 }));
-  // dark walnut is a cool chocolate brown, not red: the warm lamps add the warmth
-  const dark = [30, 22, 16];
-  const mid = [50, 37, 27];
-  const light = [64, 48, 35];
-
-  for (let y = 0; y < H; y += 1) {
-    for (let x = 0; x < W; x += 1) {
-      // the grain wanders a little as it runs up the board
-      const u =
-        x +
-        Math.sin((y / H) * Math.PI * 2 * 3 + x * 0.02) * 7 +
-        Math.sin((y / H) * Math.PI * 2 * 7) * 2;
-      // a soft figure, the fibres over it, and the board's own unevenness - none of them strong
-      const figure = 0.5 + 0.5 * Math.sin((u / W) * Math.PI * 2 * 3 + Math.sin((y / H) * Math.PI * 4) * 1.2);
-      const fine = sample(u);
-      let v = 0.3 + 0.2 * figure + 0.35 * fine + 0.06 * rand();
-      for (const s of streaks) {
-        // distance to the streak, wrapping round the board's edges
-        const d = Math.abs(((u - s.x + W * 1.5) % W) - W / 2);
-        if (d < s.w) v -= s.k * 0.5 * (1 - d / s.w);
-      }
-      v = Math.min(1, Math.max(0, v));
-      const lo = v < 0.5 ? dark : mid;
-      const hi = v < 0.5 ? mid : light;
-      const f = v < 0.5 ? v * 2 : (v - 0.5) * 2;
-      const i = (y * W + x) * 4;
-      cimg.data[i] = lo[0] + (hi[0] - lo[0]) * f;
-      cimg.data[i + 1] = lo[1] + (hi[1] - lo[1]) * f;
-      cimg.data[i + 2] = lo[2] + (hi[2] - lo[2]) * f;
-      cimg.data[i + 3] = 255;
-      // open pores sit low and catch less light
-      const pore = rand() > 0.985 ? -0.6 : 0;
-      height[y * W + x] = fine * 0.6 + figure * 0.4 + pore;
-      const r = 150 + (1 - fine) * 30 - pore * 40;
-      rimg.data[i] = rimg.data[i + 1] = rimg.data[i + 2] = r;
-      rimg.data[i + 3] = 255;
-    }
-  }
-  cctx.putImageData(cimg, 0, 0);
-  rctx.putImageData(rimg, 0, 0);
-  const n = normalFrom(height, W, H, 1.4);
-  if (!n) return null;
-
-  walnut = {
-    map: repeatTexture(colour, true),
-    normalMap: repeatTexture(n, false),
-    roughnessMap: repeatTexture(rough, false),
-  };
-  // the leaf's UVs are in hall units: one board is 0.9 wide and 3.6 tall
-  for (const t of [walnut.map, walnut.normalMap, walnut.roughnessMap]) t.repeat.set(1 / 0.9, 1 / 3.6);
-  return walnut;
-}
-
 let ajrak: { map: THREE.Texture; normalMap: THREE.Texture } | null = null;
 
 /**
@@ -279,4 +178,161 @@ export function getBossEngraving() {
   boss.colorSpace = THREE.SRGBColorSpace;
   boss.anisotropy = 8;
   return boss;
+}
+
+let bronze: { map: THREE.Texture; normalMap: THREE.Texture; roughnessMap: THREE.Texture } | null = null;
+
+/**
+ * Old bronze, for the leaves: a warm brown metal gone dark with handling
+ * and air, mottled, with the faint green of patina settled where hands
+ * do not reach, and a soft hammered unevenness in the surface. One tile
+ * is about 0.8 m.
+ */
+export function getBronze() {
+  if (bronze) return bronze;
+  const S = 256;
+  const rand = seeded(6151);
+  const noise = (period: number) => {
+    const n = Math.max(2, Math.round(S / period));
+    const g = new Float32Array(n * n);
+    for (let i = 0; i < g.length; i += 1) g[i] = rand();
+    return (x: number, y: number) => {
+      const fx = ((x / S) * n) % n;
+      const fy = ((y / S) * n) % n;
+      const x0 = Math.floor(fx);
+      const y0 = Math.floor(fy);
+      const tx = fx - x0;
+      const ty = fy - y0;
+      const sx = tx * tx * (3 - 2 * tx);
+      const sy = ty * ty * (3 - 2 * ty);
+      const at = (i: number, j: number) => g[(j % n) * n + (i % n)];
+      const a = at(x0, y0) * (1 - sx) + at(x0 + 1, y0) * sx;
+      const b = at(x0, y0 + 1) * (1 - sx) + at(x0 + 1, y0 + 1) * sx;
+      return a * (1 - sy) + b * sy;
+    };
+  };
+  const mottle = noise(64);
+  const patina = noise(32);
+  const hammer = noise(9);
+  const colour = document.createElement("canvas");
+  colour.width = colour.height = S;
+  const rough = document.createElement("canvas");
+  rough.width = rough.height = S;
+  const cctx = colour.getContext("2d");
+  const rctx = rough.getContext("2d");
+  if (!cctx || !rctx) return null;
+  const cimg = cctx.createImageData(S, S);
+  const rimg = rctx.createImageData(S, S);
+  const height = new Float32Array(S * S);
+  for (let y = 0; y < S; y += 1) {
+    for (let x = 0; x < S; x += 1) {
+      const m = mottle(x, y);
+      const p = Math.max(0, patina(x, y) - 0.62) * 2.2;
+      const h = hammer(x, y);
+      const v = 0.78 + (m - 0.5) * 0.3 + (h - 0.5) * 0.08 + (rand() - 0.5) * 0.04;
+      const i = (y * S + x) * 4;
+      // bronze brown, drifting toward a dull green where the patina has settled
+      cimg.data[i] = Math.min(255, 255 * v * (1 - p * 0.45));
+      cimg.data[i + 1] = Math.min(255, 255 * v * (0.86 + p * 0.1));
+      cimg.data[i + 2] = Math.min(255, 255 * v * (0.66 + p * 0.12));
+      cimg.data[i + 3] = 255;
+      const r = 120 + (1 - m) * 60 + p * 60;
+      rimg.data[i] = rimg.data[i + 1] = rimg.data[i + 2] = Math.min(255, r);
+      rimg.data[i + 3] = 255;
+      height[y * S + x] = h;
+    }
+  }
+  cctx.putImageData(cimg, 0, 0);
+  rctx.putImageData(rimg, 0, 0);
+  const n = normalFrom(height, S, S, 1.6);
+  if (!n) return null;
+  bronze = { map: repeatTexture(colour, true), normalMap: repeatTexture(n, false), roughnessMap: repeatTexture(rough, false) };
+  return bronze;
+}
+
+let lattice: { relief: THREE.Texture; normalMap: THREE.Texture; jali: THREE.Texture } | null = null;
+
+/**
+ * The star lattice of a Mughal screen: eight-pointed stars on a square
+ * grid, a second set at the centre of each square, their points meeting
+ * so the straps run on unbroken from star to star.
+ *
+ * It is drawn as a height - the straps standing proud, the stars a little
+ * lower, the ground sunk - and from that come a shade for the hollows, a
+ * normal map, and a cut-out: the same lattice pierced through, for the
+ * jali in the head of each leaf, where light comes through the holes.
+ */
+export function getStarLattice() {
+  if (lattice) return lattice;
+  const S = 256;
+  const c = document.createElement("canvas");
+  c.width = c.height = S;
+  const ctx = c.getContext("2d", { willReadFrequently: true });
+  if (!ctx) return null;
+  const star = (cx: number, cy: number, r: number) => {
+    ctx.beginPath();
+    for (let k = 0; k < 16; k += 1) {
+      const a = (k * Math.PI) / 8;
+      const rr = k % 2 === 0 ? r : r * 0.62;
+      const x = cx + rr * Math.cos(a);
+      const y = cy + rr * Math.sin(a);
+      if (k === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    }
+    ctx.closePath();
+  };
+  // stars at every corner and at the centre, drawn into the neighbouring tiles too so the pattern wraps
+  const centres: [number, number][] = [];
+  for (let i = -1; i <= 2; i += 1) for (let j = -1; j <= 2; j += 1) centres.push([i * S, j * S], [i * S + S / 2, j * S + S / 2]);
+  const R = S * 0.3535;
+  const draw = (fill: string, stroke: string, width: number, fillStars: boolean) => {
+    ctx.fillStyle = fill;
+    ctx.fillRect(0, 0, S, S);
+    for (const [x, y] of centres) {
+      star(x, y, R);
+      if (fillStars) {
+        ctx.fillStyle = "rgb(110,110,110)";
+        ctx.fill();
+      }
+      ctx.strokeStyle = stroke;
+      ctx.lineWidth = width;
+      ctx.lineJoin = "miter";
+      ctx.stroke();
+    }
+  };
+  // the height: ground low, stars raised a little, straps highest
+  ctx.filter = "blur(1.6px)";
+  draw("rgb(30,30,30)", "rgb(255,255,255)", S * 0.05, true);
+  ctx.filter = "none";
+  const hdata = ctx.getImageData(0, 0, S, S).data;
+  const height = new Float32Array(S * S);
+  for (let i = 0; i < S * S; i += 1) height[i] = hdata[i * 4] / 255;
+  const normal = normalFrom(height, S, S, 5);
+  // the shade: the sunk ground darkest, the straps catching the light
+  const shade = document.createElement("canvas");
+  shade.width = shade.height = S;
+  const sctx = shade.getContext("2d");
+  if (!normal || !sctx) return null;
+  const simg = sctx.createImageData(S, S);
+  for (let i = 0; i < S * S; i += 1) {
+    const v = 0.42 + 0.58 * height[i];
+    simg.data[i * 4] = simg.data[i * 4 + 1] = simg.data[i * 4 + 2] = Math.round(255 * v);
+    simg.data[i * 4 + 3] = 255;
+  }
+  sctx.putImageData(simg, 0, 0);
+  // the cut-out: straps solid, everything between them open
+  const jali = document.createElement("canvas");
+  jali.width = jali.height = S;
+  const jctx = jali.getContext("2d");
+  if (!jctx) return null;
+  jctx.drawImage(c, 0, 0);
+  const jimg = jctx.getImageData(0, 0, S, S);
+  for (let i = 0; i < S * S; i += 1) {
+    const solid = height[i] > 0.55 ? 255 : 0;
+    jimg.data[i * 4] = jimg.data[i * 4 + 1] = jimg.data[i * 4 + 2] = solid;
+    jimg.data[i * 4 + 3] = 255;
+  }
+  jctx.putImageData(jimg, 0, 0);
+  lattice = { relief: repeatTexture(shade, true), normalMap: repeatTexture(normal, false), jali: repeatTexture(jali, false) };
+  return lattice;
 }
