@@ -4,7 +4,7 @@ import { useEffect, useMemo } from "react";
 import * as THREE from "three";
 import { SVGLoader } from "three/examples/jsm/loaders/SVGLoader.js";
 import { GOLD } from "./palette";
-import { ROOM_ICONS, type DrawnIconId, type RoomIconId, type TracedIconId } from "./roomIcons";
+import { ROOM_ICONS, type DrawnIconId, type PlaqueIconId, type TracedIconId } from "./roomIcons";
 import { drawnIcon } from "./drawnIcons";
 import { useHoloOverlay } from "./CaseModels";
 
@@ -30,7 +30,7 @@ import { useHoloOverlay } from "./CaseModels";
 */
 const DEPTH = 46;
 
-function buildGeometry(id: RoomIconId, height: number) {
+function buildGeometry(id: PlaqueIconId, height: number) {
   let shapes: THREE.Shape[];
   if (id in ROOM_ICONS) {
     const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><path d="${ROOM_ICONS[id as TracedIconId]}" fill-rule="evenodd"/></svg>`;
@@ -64,7 +64,7 @@ function buildGeometry(id: RoomIconId, height: number) {
   return geometry;
 }
 
-export function RoomIcon({ id, height = 0.98 }: { id: RoomIconId; height?: number }) {
+export function RoomIcon({ id, height = 0.98 }: { id: PlaqueIconId; height?: number }) {
   const geometry = useMemo(() => buildGeometry(id, height), [id, height]);
 
   const solid = useMemo(() => {

@@ -28,8 +28,10 @@ const BRASS = "#b8935a";
 const ICON_SCALE = 0.62;
 import { getGlassSmudge, brushedMetalFor, getContactShadow } from "./textures";
 import { isShown } from "./visibility";
+import { usePulse } from "./breath";
 import { RoomIcon } from "./RoomIcon";
-import type { RoomIconId } from "./roomIcons";
+import { BrandLogo } from "./BrandLogo";
+import { isBrandIcon, type RoomIconId } from "./roomIcons";
 
 export type VitrineShape = "icosahedron" | "sphere" | "octahedron" | "box" | "torus" | "screen" | "icon";
 
@@ -105,6 +107,10 @@ function useScreenTexture(title?: string, subtitle?: string) {
   return texture;
 }
 
+/** The inset panel on the plinth's face, as a share of the plinth's width and of its body: where the label is set. */
+export const PANEL_W = 0.86;
+export const PANEL_H = 0.86;
+
 export function Vitrine({
   position,
   shape,
@@ -164,6 +170,10 @@ export function Vitrine({
   const [hovered, setHovered] = useState(false);
   const floatBase = height + caseHeight * 0.45;
   const lit = hovered || active;
+  /* it opens a card: its own light swells and settles, slowly */
+  const breathe = usePulse(lit ? 1.6 : 1, 0.9);
+  const breatheTop = usePulse(lit ? 2.2 : 1.4, 1);
+  const breatheRing = usePulse(lit ? 0.9 : 0.55, 0.5);
 
   useEffect(() => {
     if (!hovered) return;
@@ -183,7 +193,9 @@ export function Vitrine({
         Swaying either side of the face keeps it toward the visitor and
         still shows its thickness and its bevel catching the light.
       */
-      core.rotation.y = Math.sin(state.clock.elapsedTime * 0.55 + seed) * (lit ? 1.0 : 0.72);
+      // a company's mark is read face on: it turns less than a gold piece does
+      const reach = icon && isBrandIcon(icon) ? (lit ? 0.55 : 0.32) : lit ? 1.0 : 0.72;
+      core.rotation.y = Math.sin(state.clock.elapsedTime * 0.55 + seed) * reach;
     } else {
       core.rotation.y += delta * (shape === "screen" ? 0.08 : lit ? 0.7 : 0.26);
     }
@@ -253,14 +265,14 @@ export function Vitrine({
       */}
       <group rotation={[0, faceYaw, 0]}>
         <mesh position={[0, bodyBottom + bodyH / 2, bodyW / 2 + 0.002]}>
-          <planeGeometry args={[caseWidth * 0.78, bodyH * 0.74]} />
+          <planeGeometry args={[caseWidth * PANEL_W, bodyH * PANEL_H]} />
           <meshStandardMaterial color={PANEL} roughness={0.62} metalness={0.06} envMapIntensity={0.5} />
         </mesh>
         {[
-          { p: [0, bodyH * 0.37, 0], s: [caseWidth * 0.8, 0.035, 0.03] },
-          { p: [0, -bodyH * 0.37, 0], s: [caseWidth * 0.8, 0.035, 0.03] },
-          { p: [-caseWidth * 0.39, 0, 0], s: [0.035, bodyH * 0.74 + 0.035, 0.03] },
-          { p: [caseWidth * 0.39, 0, 0], s: [0.035, bodyH * 0.74 + 0.035, 0.03] },
+          { p: [0, (bodyH * PANEL_H) / 2, 0], s: [caseWidth * PANEL_W + 0.035, 0.035, 0.03] },
+          { p: [0, -(bodyH * PANEL_H) / 2, 0], s: [caseWidth * PANEL_W + 0.035, 0.035, 0.03] },
+          { p: [-(caseWidth * PANEL_W) / 2, 0, 0], s: [0.035, bodyH * PANEL_H + 0.035, 0.03] },
+          { p: [(caseWidth * PANEL_W) / 2, 0, 0], s: [0.035, bodyH * PANEL_H + 0.035, 0.03] },
         ].map((m, i) => (
           <RoundedBox
             key={i}
@@ -351,6 +363,7 @@ export function Vitrine({
           <mesh position={[-sx * 0.025, 0, -sz * 0.025]}>
             <boxGeometry args={[0.012, caseHeight * 0.94, 0.012]} />
             <meshStandardMaterial
+              ref={breathe}
               color={CASE_LIGHT}
               emissive={CASE_LIGHT}
               emissiveIntensity={lit ? 1.6 : 1}
@@ -395,6 +408,7 @@ export function Vitrine({
       <mesh position={[0, height + caseHeight - 0.01, 0]}>
         <boxGeometry args={[caseWidth - 0.06, 0.03, caseWidth - 0.06]} />
         <meshStandardMaterial
+          ref={breatheTop}
           color={CASE_LIGHT}
           emissive={CASE_LIGHT}
           emissiveIntensity={lit ? 2.2 : 1.4}
@@ -409,6 +423,7 @@ export function Vitrine({
       <mesh position={[0, deckY + 0.004, 0]} rotation={[-Math.PI / 2, 0, 0]}>
         <ringGeometry args={[caseWidth * 0.24, caseWidth * 0.38, 48]} />
         <meshStandardMaterial
+          ref={breatheRing}
           color={CASE_LIGHT}
           emissive={CASE_LIGHT}
           emissiveIntensity={lit ? 0.9 : 0.55}
@@ -424,7 +439,7 @@ export function Vitrine({
             <meshStandardMaterial
               map={screenTexture}
               emissiveMap={screenTexture}
-              emissive="#ffffff"
+              emissive="#ffe9cc"
               emissiveIntensity={0.85}
               toneMapped={false}
               side={THREE.DoubleSide}
@@ -433,7 +448,7 @@ export function Vitrine({
         ) : shape === "icon" ? (
           icon ? (
             <group rotation={[0, faceYaw, 0]}>
-              <RoomIcon id={icon} />
+              {isBrandIcon(icon) ? <BrandLogo id={icon} /> : <RoomIcon id={icon} />}
             </group>
           ) : null
         ) : shape !== "screen" ? (

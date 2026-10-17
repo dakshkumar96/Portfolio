@@ -17,9 +17,16 @@
  * credited, which belongs on the credits page.
  */
 /** Traced from the supplied images (below), and drawn in code (drawnIcons.ts). */
+import { BRAND_IDS, type BrandId } from "./brandLogos";
+
 export type TracedIconId = "code" | "ai" | "pen" | "phone";
 export type DrawnIconId = "orbit" | "globe" | "mic" | "cap" | "trophy" | "clapper";
-export type RoomIconId = TracedIconId | DrawnIconId;
+export type PlaqueIconId = TracedIconId | DrawnIconId;
+/** A real organisation's logo, built as an enamel badge (BrandLogo.tsx). */
+export type BrandIconId = BrandId;
+export type RoomIconId = PlaqueIconId | BrandIconId;
+
+export const isBrandIcon = (id: RoomIconId): id is BrandIconId => (BRAND_IDS as readonly string[]).includes(id);
 
 export const ROOM_ICONS: Record<TracedIconId, string> = {
   code: "M 260 4 L 34 4 34 19 L 34 34 19 34 L 4 34 4 260 L 4 486 19 486 L 34 486 34 501 L 34 516 260 516 L 486 516 486 501 L 486 486 501 486 L 516 486 516 260 L 516 34 501 34 L 486 34 486 19 L 486 4 260 4 M 260 34 L 34 34 34 94.500 L 34 155 260 155 L 486 155 486 94.500 L 486 34 260 34 M 79 64 L 64 64 64 79 L 64 94 79 94 L 94 94 94 79 L 94 64 79 64 M 139.942 64.224 L 125.385 63.949 124.692 64.641 L 124 65.333 124 79.667 L 124 94 139.527 94 L 155.053 94 154.777 79.250 L 154.500 64.500 139.942 64.224 M 200 64 L 185 64 185 79 L 185 94 200 94 L 215 94 215 79 L 215 64 200 64 M 290 215 L 275 215 275 245 L 275 275 260 275 L 245 275 245 305 L 245 335 230 335 L 215 335 215 365.500 L 215 396 230 396 L 245 396 245 365.500 L 245 335 260 335 L 275 335 275 305 L 275 275 290 275 L 305 275 305 245 L 305 215 290 215 M 170 245 L 155 245 155 260 L 155 275 139.500 275 L 124 275 124 290 L 124 305 109 305 L 94 305 94 320 L 94 335 109 335 L 124 335 124 350 L 124 365 139.500 365 L 155 365 155 380.527 L 155 396.053 169.750 395.777 L 184.500 395.500 184.500 380.500 L 184.500 365.500 169.777 365.223 L 155.053 364.947 154.777 350.223 L 154.500 335.500 139.250 335.224 L 124 334.948 124 319.974 L 124 305 139.500 305 L 155 305 155 290 L 155 275 170 275 L 185 275 185 260 L 185 245 170 245 M 350 245 L 335 245 335 260 L 335 275 350 275 L 365 275 365 290 L 365 305 380.500 305 L 396 305 396 319.974 L 396 334.948 380.750 335.224 L 365.500 335.500 365.223 350.223 L 364.947 364.947 350.223 365.223 L 335.500 365.500 335.500 380.500 L 335.500 395.500 350.250 395.777 L 365 396.053 365 380.527 L 365 365 380.500 365 L 396 365 396 350 L 396 335 411 335 L 426 335 426 320 L 426 305 411 305 L 396 305 396 290 L 396 275 380.500 275 L 365 275 365 260 L 365 245 350 245",
@@ -33,11 +40,17 @@ export const ROOM_ICONS: Record<TracedIconId, string> = {
  * not by title because a title like "Design" is not unique to one room.
  */
 export const ROOM_ICON_FOR: Record<string, RoomIconId> = {
-  "exp-royal-holloway-research-assistant": "orbit",
-  "exp-international-society-president": "globe",
-  "exp-palmy-marketing-coordinator": "mic",
-  "exp-education": "cap",
-  "exp-recognition": "trophy",
+  "exp-research": "rhul",
+  "exp-president": "intsoc",
+  "exp-marketing": "palmy",
+  "exp-nextround": "nextround",
+  "exp-host": "insanity",
+  "exp-ambassador": "rhul",
+  "exp-hall-life": "rhul",
+  "exp-video": "fiverr",
+  "exp-bar": "wetherspoon",
+  "about-education": "cap",
+  "about-awards": "trophy",
   "exp-alongside": "clapper",
   "skill-Dev": "code",
   "skill-AI / ML": "ai",

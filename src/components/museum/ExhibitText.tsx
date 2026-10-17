@@ -7,53 +7,63 @@ import { GOLD, GOLD_HOT } from "./theme";
 const PAD = 48;
 const FONT_PX = 128;
 
+/** The page's Garamond, under the generated name next/font gave it. */
+function labelFace() {
+  const v = getComputedStyle(document.documentElement).getPropertyValue("--font-cormorant").trim();
+  return v ? `${v}, Georgia, serif` : "Georgia, serif";
+}
+
+function drawLabel(canvas: HTMLCanvasElement, text: string) {
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return;
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.font = `600 ${FONT_PX}px ${labelFace()}`;
+  ctx.letterSpacing = "0.12em";
+  ctx.textBaseline = "middle";
+  ctx.textAlign = "center";
+  ctx.fillStyle = "#ffffff";
+  ctx.fillText(text, canvas.width / 2, canvas.height / 2 + FONT_PX * 0.04);
+}
+
 /**
  * Text living in the 3D scene, drawn to a canvas at runtime.
+ *
+ * Set the way a museum letters its labels: the site's Garamond in spaced
+ * capitals, gilt-coloured and lit a little from within, rather than a
+ * heavy interface sans. Drawn at once in whatever serif is ready, and
+ * again in the Garamond when it has loaded; the canvas keeps its size, so
+ * the label never moves.
  *
  * Not extruded geometry: three ships no typeface JSON and troika fetches
  * its font from a CDN, so real TextGeometry would mean a runtime network
  * dependency. Layering a few offset copies gives it depth instead, and
  * it stays lit, occluded and clickable like any other object.
  */
+function makeLabel(raw: string) {
+  const text = raw.toUpperCase();
+  const canvas = document.createElement("canvas");
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return null;
+  // measured in the fallback, which is wider than the Garamond, so the final face always fits
+  ctx.font = `600 ${FONT_PX}px Georgia, serif`;
+  ctx.letterSpacing = "0.12em";
+  const w = Math.ceil(ctx.measureText(text).width * 1.04) + PAD * 2;
+  const h = FONT_PX + PAD * 2;
+  canvas.width = w;
+  canvas.height = h;
+  drawLabel(canvas, text);
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.anisotropy = 8;
+  document.fonts?.load(`600 ${FONT_PX}px ${labelFace()}`, text).then(() => {
+    drawLabel(canvas, text);
+    texture.needsUpdate = true;
+  }).catch(() => {});
+  return { texture, aspect: w / h };
+}
+
 function useTextTexture(text: string) {
-  const result = useMemo(() => {
-    const canvas = document.createElement("canvas");
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return null;
-
-    /*
-      Heavy, and tracked out.
-
-      At 600 the lettering thinned to almost nothing once it was
-      emissive - a glow spreads, so a light weight eats itself and
-      leaves a smear. 800 holds its shape under bloom, and the letter
-      spacing stops the glow of one character closing the gap to the
-      next.
-    */
-    const font = `800 ${FONT_PX}px Inter, system-ui, sans-serif`;
-    ctx.font = font;
-    ctx.letterSpacing = "0.06em";
-    const metrics = ctx.measureText(text);
-    const w = Math.ceil(metrics.width) + PAD * 2;
-    const h = FONT_PX + PAD * 2;
-
-    canvas.width = w;
-    canvas.height = h;
-
-    // resizing clears the context, so restate the font
-    ctx.font = font;
-    ctx.letterSpacing = "0.06em";
-    ctx.textBaseline = "middle";
-    ctx.textAlign = "center";
-    ctx.fillStyle = "#ffffff";
-    ctx.fillText(text, w / 2, h / 2);
-
-    const texture = new THREE.CanvasTexture(canvas);
-    texture.colorSpace = THREE.SRGBColorSpace;
-    texture.anisotropy = 8;
-    return { texture, aspect: w / h };
-  }, [text]);
-
+  const result = useMemo(() => makeLabel(text), [text]);
   useEffect(() => () => result?.texture.dispose(), [result]);
   return result;
 }
@@ -61,13 +71,16 @@ function useTextTexture(text: string) {
 export function ExhibitText({
   text,
   position,
-  height = 0.34,
+  height: wanted = 0.34,
+  maxWidth,
   active = false,
   onSelect,
 }: {
   text: string;
   position: [number, number, number];
   height?: number;
+  /** The most the lettering may be wide: it is made smaller, whole, rather than run past what it labels. */
+  maxWidth?: number;
   active?: boolean;
   onSelect?: () => void;
 }) {
@@ -84,6 +97,7 @@ export function ExhibitText({
   }, [hovered]);
 
   if (!data) return null;
+  const height = maxWidth && wanted * data.aspect > maxWidth ? maxWidth / data.aspect : wanted;
   const width = height * data.aspect;
 
   // a few receding copies read as extrusion under bloom
@@ -109,7 +123,7 @@ export function ExhibitText({
               map={data.texture}
               emissiveMap={data.texture}
               emissive={lit ? GOLD_HOT : GOLD}
-              emissiveIntensity={lit ? 3.6 : 2.3}
+              emissiveIntensity={lit ? 2.4 : 1.5}
               color="#000000"
               transparent
               depthWrite
