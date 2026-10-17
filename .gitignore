@@ -45,3 +45,6 @@ next-env.d.ts
 
 # uncompressed source models, kept locally so the optimised ones can be regenerated
 .model-originals/
+
+# the background music is a commercial recording, kept local and never published
+/public/audio/*.mp3
