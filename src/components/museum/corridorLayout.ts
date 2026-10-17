@@ -20,12 +20,8 @@ export const Z_NEAR = 20;
 export const LENGTH = 134;
 export const Z_FAR = Z_NEAR - LENGTH;
 
-/** Two long ceiling slots that drop angled shafts onto the floor. */
-export const SLOT_X = 2.7;
-export const SLOT_WIDTH = 0.55;
-
-/** One case sits in each gap between doors, alternating sides. */
-export const CASE_X = 4.8;
+/** One case sits in each gap between doors, alternating sides, close in to the wall so the middle of the hall is clear. */
+export const CASE_X = 6.1;
 
 export const DOOR_W = 3.4;
 export const DOOR_H = 5.6;
@@ -73,17 +69,17 @@ export const doors: DoorSpec[] = (
  * stretch of the walk has no light source in it at all.
  */
 export const CASE_POSITIONS: [number, number][] = (() => {
-  const zs: number[] = [2];
+  /*
+    The first case stands a bay back from where the camera starts, and
+    the rest in the bay between each pair of doors, alternating sides, so
+    the walk zigzags past them the length of the hall; none stands in
+    front of a door.
+  */
+  const zs: number[] = [-7];
   for (let i = 0; i < doors.length - 1; i += 1) {
     zs.push((doors[i].z + doors[i + 1].z) / 2);
   }
-  /*
-    And one past the last door, so the six cases survived losing a door.
-    Without it the run ended on a doorway and the last stretch of hall
-    had nothing in it at all.
-  */
-  zs.push(doors[doors.length - 1].z - DOOR_GAP / 2);
-  // six doors put the tail's case past the end of the hall; six cases is what there are to show
+  // six cases is what there are to show
   zs.length = Math.min(zs.length, 6);
   return zs.map((z, i) => [i % 2 === 0 ? -CASE_X : CASE_X, z] as [number, number]);
 })();
@@ -99,11 +95,12 @@ export const CASE_POSITIONS: [number, number][] = (() => {
  * strongest signal that the two are the same building.
  *
  * Width is checked against the door spacing: doors alternate sides, so
- * two rooms on the same wall are DOOR_GAP * 2 = 36 apart and 24 clears
- * that comfortably.
+ * two rooms on the same wall are DOOR_GAP * 2 = 36 apart and 30 clears
+ * that with a wall's thickness to spare. They are built large, as the
+ * rooms of a real gallery are: big enough to stand back from the work.
  */
-export const ROOM_DEPTH = 20;
-export const ROOM_WIDTH = 24;
+export const ROOM_DEPTH = 32;
+export const ROOM_WIDTH = 34;
 export const ROOM_H = WALL_H;
 
 /**
@@ -116,7 +113,18 @@ export const ROOM_H = WALL_H;
  * back wall, so it can be as deep as it likes.
  */
 export function roomSize(door: DoorSpec) {
-  return door.id === "experience" ? { depth: 26, width: 32 } : { depth: ROOM_DEPTH, width: ROOM_WIDTH };
+  // the Art room is more than twice what it was: as wide as the doors' spacing allows, and twice as deep
+  if (door.id === "art") return { depth: 50, width: 34 };
+  // the About room has four photographs, three boards and a case on each side wall: as wide as the spacing allows, and deep
+  if (door.id === "about") return { depth: 50, width: 34 };
+  /*
+    The Experience room has the most in it, and is twice the floor of any
+    other: as wide as the doors' spacing allows (rooms on one side are 36
+    apart, so 34 leaves a wall between them) and twice as deep, since
+    nothing stands beyond its back wall. Three cases across the far end,
+    two against the middle of each long wall, and boards between.
+  */
+  return door.id === "experience" ? { depth: 68, width: 34 } : { depth: ROOM_DEPTH, width: ROOM_WIDTH };
 }
 
 export function roomCenter(door: DoorSpec): [number, number] {

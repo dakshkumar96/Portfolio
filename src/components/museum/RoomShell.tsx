@@ -1,49 +1,43 @@
 "use client";
 
-import { memo, useEffect, useMemo, useRef, useState } from "react";
+import { memo, useEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
 import { useFrame } from "@react-three/fiber";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
-import { blackBrickFor, plasterFor, PLASTER_TILE } from "./textures";
-import { GOLD, MID, SHELL } from "./palette";
-import {
-  CAM_Y,
-  DOOR_H,
-  DOOR_RECESS,
-  DOOR_W,
-  ROOM_H,
-  roomCenter,
-  roomSize,
-  type DoorSpec,
-} from "./corridorLayout";
-import { CASE_INSET, backWallX, roomView, slotX, spotPlan } from "./roomLayout";
+import { plasterFor, PLASTER_TILE } from "./textures";
+import { GOLD, SHELL } from "./palette";
+import { CAM_Y, DOOR_H, DOOR_RECESS, DOOR_W, ROOM_H, roomCenter, roomSize, type DoorSpec } from "./corridorLayout";
+import { backWallX, roomView, slotX, spotPlan } from "./roomLayout";
+import { block, ease, merged, pilaster, shade as bake, sweptProfile, worldUV } from "./architecture";
+import { StoneMaterial, corniceProfile } from "./Vault";
+import { damaskFor, getLaylight, getMedallion, marbleFor } from "./roomTextures";
+import { getStoneGrain } from "./stoneTextures";
+import { gildedLettering } from "./inscriptions";
 
 /**
  * One room, built once, for every room.
  *
- * Each chamber used to be the corridor's wall system stood up four times -
- * large cladding panels with dark seams, a recessed channel with a lit
- * hairline, a bright strip at the floor and a cove at the head - under a
- * ceiling of floor pavers. In a room that read as a plain box with objects
- * in it, and the tile grid was the loudest thing in every frame.
+ * A gallery room is built in the same order as the hall it opens off,
+ * and dressed the way the great picture galleries are:
  *
- * This is an interior instead, built the way a gallery room is:
- *
- *  - walls of continuous sandstone plaster, quiet enough to sit behind the
- *    exhibits, with a moulded skirting at the foot and a cornice at the head
- *  - a coffered ceiling, with warm light slots let into it, so the light has
- *    somewhere to come from
- *  - the hall's dark pavers underfoot, a little softer, and one gold inlay
- *    running from the doorway toward the exhibits
- *  - a pilaster in each corner, so the walls meet with some depth
+ *  - the walls hung in silk damask, deep and quiet, its pattern showing
+ *    only as a change of sheen where the light falls on it
+ *  - below that a dado of stone panels under a rail, and a moulded
+ *    skirting, so nothing stands straight against the cloth at the floor
+ *  - fluted pilasters, the hall's own, carrying an entablature round the
+ *    room: architrave, a frieze with the room's name cut in it over the
+ *    work, and the cornice with its dentils
+ *  - a coffered ceiling, the coffers over the middle of the room glazed as
+ *    a laylight, so the light seems to come down from above
+ *  - a floor of polished marble slabs inside a border, with a star of
+ *    stone and brass set into it in front of the work
  *  - faint beams of haze under the exhibit spotlights
  *
  * Every room gets the same shell; only what stands in it differs.
  *
- * Nothing here adds a light or a new kind of material. The spotlights are
- * the permanent pool in <RoomLights>, re-aimed per room, and every surface
- * uses a material the hall already compiles - so walking into a room never
- * recompiles a shader.
+ * Nothing here adds a light. The spotlights are the permanent pool in
+ * <RoomLights>, re-aimed per room; what glows here glows by its own
+ * material.
  *
  * Local frame for anything built against a wall: the face lies in XY at
  * z = 0 looking down +Z, so +Z is into the room and anything proud of the
@@ -54,19 +48,8 @@ import { CASE_INSET, backWallX, roomView, slotX, spotPlan } from "./roomLayout";
 /* Materials                                                           */
 /* ------------------------------------------------------------------ */
 
-/** Sandstone plaster. Matte (about 0.9), low relief, and a touch of colour drift between surfaces. */
-function Plaster({
-  rx,
-  ry,
-  tint = SHELL.wall,
-  glow = 0,
-}: {
-  rx: number;
-  ry: number;
-  tint?: string;
-  /** a faint self-light, standing in for light bounced up from the floor */
-  glow?: number;
-}) {
+/** Sandstone plaster, for the ceiling slab. */
+function Plaster({ rx, ry, tint = SHELL.wall, glow = 0 }: { rx: number; ry: number; tint?: string; glow?: number }) {
   const pbr = useMemo(() => plasterFor(rx, ry), [rx, ry]);
   return (
     <meshStandardMaterial
@@ -84,11 +67,30 @@ function Plaster({
   );
 }
 
-/** The same colour drift as the walls, without a texture, for mouldings whose extrusions have no useful UVs. */
-const STONE_DARK = "#2a1d13";
+/** Silk damask, sized to the surface it hangs on. */
+function Damask({ w, h, tint }: { w: number; h: number; tint: string }) {
+  const pbr = useMemo(() => damaskFor(w, h), [w, h]);
+  return (
+    <meshStandardMaterial
+      color={tint}
+      map={pbr?.map ?? null}
+      normalMap={pbr?.normalMap ?? null}
+      roughnessMap={pbr?.roughnessMap ?? null}
+      normalScale={new THREE.Vector2(0.35, 0.35)}
+      roughness={1}
+      metalness={0}
+      envMapIntensity={0.55}
+      emissive={tint}
+      emissiveIntensity={0.03}
+    />
+  );
+}
+
+/** The damask: a deep umber silk, a shade warmer than the hall's stone. */
+const SILK = "#55392a";
 
 /** Shift a hex colour's lightness by a fraction, for per-surface variation. */
-function shade(hex: string, amount: number) {
+function tone(hex: string, amount: number) {
   const c = new THREE.Color(hex);
   const hsl = { h: 0, s: 0, l: 0 };
   c.getHSL(hsl);
@@ -96,163 +98,198 @@ function shade(hex: string, amount: number) {
   return `#${c.getHexString()}`;
 }
 
-/** Warm light, never white: the slots, the skirting strip, the inlay's glint. */
+/** Warm light, never white: the spotlight track, the inlay's glint. */
 const WARM = "#e0b070";
-
-/* ------------------------------------------------------------------ */
-/* Mouldings                                                           */
-/* ------------------------------------------------------------------ */
-
-type Profile = (s: THREE.Shape) => void;
-
-/**
- * The skirting: a plain plinth face, a chamfer, a cove and a small bead.
- * Drawn as (out from the wall, up), 0.72 tall and 0.16 deep.
- */
-const BASE_PROFILE: Profile = (s) => {
-  s.moveTo(0, 0);
-  s.lineTo(0.16, 0);
-  s.lineTo(0.16, 0.44);
-  s.lineTo(0.14, 0.47);
-  s.lineTo(0.14, 0.52);
-  s.quadraticCurveTo(0.14, 0.62, 0.075, 0.64);
-  s.lineTo(0.06, 0.66);
-  s.lineTo(0.06, 0.69);
-  s.quadraticCurveTo(0.06, 0.72, 0.03, 0.72);
-  s.lineTo(0, 0.72);
-  s.closePath();
-};
-const BASE_LIFT = 0.07;
-
-/**
- * The cornice: a deep cove under a projecting fillet, stepped back to the
- * wall in two small bevels. Drawn downward from the ceiling, 0.62 deep.
- */
-const CORNICE_PROFILE: Profile = (s) => {
-  s.moveTo(0, 0);
-  s.lineTo(0.62, 0);
-  s.lineTo(0.62, -0.1);
-  s.lineTo(0.56, -0.14);
-  s.lineTo(0.56, -0.18);
-  s.quadraticCurveTo(0.56, -0.5, 0.18, -0.56);
-  s.lineTo(0.14, -0.6);
-  s.lineTo(0.14, -0.66);
-  s.lineTo(0.08, -0.7);
-  s.lineTo(0.08, -0.78);
-  s.lineTo(0, -0.82);
-  s.closePath();
-};
-
-/**
- * A profile run along a wall. The extrusion is centred on x and lies in
- * the wall's local frame, so the same moulding stands on any wall. Runs on
- * neighbouring walls overlap at the corners, and two solid profiles
- * meeting like that make a clean inside corner without mitring.
- */
-function useRun(profile: Profile, length: number) {
-  const geo = useMemo(() => {
-    const shape = new THREE.Shape();
-    profile(shape);
-    const g = new THREE.ExtrudeGeometry(shape, { depth: length, bevelEnabled: false, curveSegments: 6 });
-    g.translate(0, 0, -length / 2);
-    // shape x -> out of the wall (+z), extrusion -> along the wall (x)
-    g.rotateY(-Math.PI / 2);
-    return g;
-  }, [profile, length]);
-  useEffect(() => () => geo.dispose(), [geo]);
-  return geo;
-}
-
-function Skirting({ x, length }: { x: number; length: number }) {
-  const geo = useRun(BASE_PROFILE, length);
-  return (
-    <group position={[x, 0, 0]}>
-      <mesh geometry={geo} position={[0, BASE_LIFT, 0]}>
-        <meshStandardMaterial color={STONE_DARK} roughness={0.58} metalness={0.12} envMapIntensity={0.6} />
-      </mesh>
-      {/* the shadow gap it stands over */}
-      <mesh position={[0, BASE_LIFT / 2, 0.06]}>
-        <boxGeometry args={[length, BASE_LIFT, 0.12]} />
-        <meshStandardMaterial color={SHELL.recess} roughness={0.95} />
-      </mesh>
-      {/*
-        The floor strip: warm, and well under what the old white one ran
-        at - a glint along the foot of the wall, not a line of light.
-      */}
-      <mesh position={[0, 0.018, 0.17]}>
-        <boxGeometry args={[length, 0.02, 0.018]} />
-        <meshStandardMaterial color={WARM} emissive={WARM} emissiveIntensity={0.55} roughness={0.6} />
-      </mesh>
-    </group>
-  );
-}
-
-function Cornice({ length, height }: { length: number; height: number }) {
-  const geo = useRun(CORNICE_PROFILE, length);
-  return (
-    <mesh geometry={geo} position={[0, height, 0]}>
-      <meshStandardMaterial color={shade(SHELL.wall, 0.12)} roughness={0.86} metalness={0} envMapIntensity={0.35} />
-    </mesh>
-  );
-}
 
 /* ------------------------------------------------------------------ */
 /* Walls                                                               */
 /* ------------------------------------------------------------------ */
 
+/** The skirting: a plain plinth face, a chamfer, a cove and a small bead, drawn (out, up). */
+const SKIRTING: [number, number][] = [
+  [0.16, 0],
+  [0.16, 0.44],
+  [0.14, 0.47],
+  [0.14, 0.52],
+  [0.11, 0.59],
+  [0.075, 0.64],
+  [0.06, 0.66],
+  [0.06, 0.69],
+  [0.035, 0.72],
+];
+const SKIRTING_H = 0.72;
+/** The dado runs from the skirting to here, and the silk from here up. */
+const DADO_TOP = 1.55;
+/** The dado rail: a small rounded moulding capping the panels. */
+const RAIL: [number, number][] = [
+  [0.05, 0],
+  [0.085, 0.025],
+  [0.085, 0.06],
+  [0.065, 0.085],
+  [0.03, 0.1],
+];
+/** The architrave over the pilasters: two fascias and a small cap. */
+const ARCHITRAVE: [number, number][] = [
+  [0.06, 0],
+  [0.06, 0.12],
+  [0.085, 0.14],
+  [0.085, 0.26],
+  [0.12, 0.3],
+];
+const ARCHITRAVE_H = 0.3;
+const FRIEZE_H = 0.8;
+const CORNICE_H = 0.82;
+/** Where the entablature starts, on the pilasters' capitals. */
+const ENTABLATURE_Y = ROOM_H - CORNICE_H - FRIEZE_H - ARCHITRAVE_H;
+
 type Run = { x: number; len: number };
+const NONE: number[] = [];
 
 /**
- * A wall of the room: plaster, skirting, cornice. An opening, if there is
- * one, is left as a hole in the lower part, with the plaster closing over
- * its head; the cornice runs straight through above it.
+ * A wall's stonework, merged into one mesh: skirting, dado and rail along
+ * each run of wall, the entablature the whole length, and the pilasters.
+ * Each piece carries the shade of its own hollows.
+ */
+function useWallStone(length: number, runs: Run[], pilasterXs: number[]) {
+  const geo = useMemo(() => {
+    const parts: THREE.BufferGeometry[] = [];
+    const onWall = (from: number, to: number) => (q: THREE.Vector3) => 0.45 + 0.55 * ease(from, to, q.z);
+    const sweep = (pts: [number, number][], len: number, x0: number, y: number, from: number, to: number) => {
+      const g = sweptProfile(pts, len);
+      g.translate(x0, y, 0);
+      parts.push(bake(g, onWall(from, to)));
+    };
+    for (const run of runs) {
+      const x0 = run.x - run.len / 2;
+      sweep(SKIRTING, run.len, x0, 0, 0, 0.16);
+      // the dado: a board, and raised panels let into it, under its rail
+      parts.push(bake(block(run.len, DADO_TOP - SKIRTING_H, 0.05, SKIRTING_H, run.x), () => 0.62));
+      const n = Math.max(1, Math.floor(run.len / 1.7));
+      const pitch = run.len / n;
+      for (let k = 0; k < n; k += 1) {
+        const cx = x0 + pitch * (k + 0.5);
+        const pw = pitch - 0.34;
+        const panel = new THREE.Shape([
+          new THREE.Vector2(cx - pw / 2, SKIRTING_H + 0.14),
+          new THREE.Vector2(cx + pw / 2, SKIRTING_H + 0.14),
+          new THREE.Vector2(cx + pw / 2, DADO_TOP - 0.24),
+          new THREE.Vector2(cx - pw / 2, DADO_TOP - 0.24),
+        ]);
+        const g = new THREE.ExtrudeGeometry(panel, {
+          depth: 0.015,
+          bevelEnabled: true,
+          bevelThickness: 0.02,
+          bevelSize: 0.03,
+          bevelSegments: 2,
+          curveSegments: 1,
+        });
+        g.translate(0, 0, 0.07);
+        parts.push(bake(g, onWall(0.05, 0.11)));
+      }
+      sweep(RAIL, run.len, x0, DADO_TOP - 0.1, 0.02, 0.085);
+    }
+
+    // the entablature, the length of the wall: architrave, frieze, cornice and its dentils
+    sweep(ARCHITRAVE, length, -length / 2, ENTABLATURE_Y, 0, 0.12);
+    parts.push(bake(block(length, FRIEZE_H, 0.08, ENTABLATURE_Y + ARCHITRAVE_H), () => 0.8));
+    sweep(corniceProfile(), length, -length / 2, ROOM_H - CORNICE_H, 0.2, 0.74);
+    const dentils: THREE.BufferGeometry[] = [];
+    for (let x = -length / 2 + 0.1; x < length / 2 - 0.1; x += 0.22) dentils.push(block(0.12, 0.15, 0.46, ROOM_H - CORNICE_H + 0.1, x));
+    parts.push(bake(merged(dentils), onWall(0.2, 0.74)));
+
+    if (pilasterXs.length) {
+      const shaft = pilaster(0.9, 0.38, ENTABLATURE_Y);
+      for (const x of pilasterXs) {
+        const g = shaft.clone();
+        g.translate(x, 0, 0);
+        parts.push(g);
+      }
+      shaft.dispose();
+    }
+    return worldUV(merged(parts), 2.6);
+  }, [length, runs, pilasterXs]);
+  useEffect(() => () => geo.dispose(), [geo]);
+  return geo;
+}
+
+/** The room's name, cut in the frieze over the work and gilded. */
+function FriezeName({ label, length }: { label: string; length: number }) {
+  const w = Math.min(length - 6, 14);
+  const tex = useMemo(() => gildedLettering(label.toUpperCase(), { width: 2048, height: 136, cap: 84, tracking: 0.3 }), [label]);
+  useEffect(() => () => tex.dispose(), [tex]);
+  return (
+    <mesh position={[0, ENTABLATURE_Y + ARCHITRAVE_H + FRIEZE_H / 2, 0.084]}>
+      <planeGeometry args={[w, (w * 136) / 2048]} />
+      <meshStandardMaterial
+        map={tex}
+        alphaTest={0.35}
+        roughness={0.3}
+        metalness={1}
+        envMapIntensity={1.4}
+        /* lit from within, as the door signs are: gilt alone only reflects the dark room and read as faint */
+        emissive="#ffd9a0"
+        emissiveMap={tex}
+        emissiveIntensity={1.7}
+      />
+    </mesh>
+  );
+}
+
+/**
+ * A wall of the room. An opening, if there is one, is left as a hole in
+ * the lower part, with the silk closing over its head; the entablature
+ * runs straight through above it.
  */
 function Wall({
   position,
   yaw,
   length,
-  height,
   opening,
   tint,
+  pilasterXs = NONE,
+  label,
 }: {
   position: [number, number, number];
   yaw: number;
   length: number;
-  height: number;
   opening?: { width: number; height: number };
   tint: string;
+  pilasterXs?: number[];
+  /** the room's name, for the frieze of the wall the work hangs on */
+  label?: string;
 }) {
-  const runs: Run[] = opening
-    ? (() => {
-        const seg = (length - opening.width) / 2;
-        const off = opening.width / 2 + seg / 2;
-        return [
-          { x: -off, len: seg },
-          { x: off, len: seg },
-        ];
-      })()
-    : [{ x: 0, len: length }];
+  const openW = opening?.width ?? 0;
+  const runs = useMemo<Run[]>(() => {
+    if (!openW) return [{ x: 0, len: length }];
+    const seg = (length - openW) / 2;
+    const off = openW / 2 + seg / 2;
+    return [
+      { x: -off, len: seg },
+      { x: off, len: seg },
+    ];
+  }, [length, openW]);
+  const stone = useWallStone(length, runs, pilasterXs);
+  const silkH = ENTABLATURE_Y - DADO_TOP;
 
   return (
     <group position={position} rotation={[0, yaw, 0]}>
       {runs.map((run) => (
-        <group key={run.x}>
-          <mesh position={[run.x, height / 2, 0]}>
-            <planeGeometry args={[run.len, height]} />
-            <Plaster rx={run.len / PLASTER_TILE} ry={height / PLASTER_TILE} tint={tint} />
-          </mesh>
-          <Skirting x={run.x} length={run.len} />
-        </group>
+        <mesh key={run.x} position={[run.x, DADO_TOP + silkH / 2, 0]}>
+          <planeGeometry args={[run.len, silkH]} />
+          <Damask w={run.len} h={silkH} tint={tint} />
+        </mesh>
       ))}
-
       {opening ? (
-        <mesh position={[0, (height + opening.height) / 2, 0]}>
-          <planeGeometry args={[opening.width, height - opening.height]} />
-          <Plaster rx={opening.width / PLASTER_TILE} ry={(height - opening.height) / PLASTER_TILE} tint={tint} />
+        <mesh position={[0, (ENTABLATURE_Y + opening.height) / 2, 0]}>
+          <planeGeometry args={[opening.width, ENTABLATURE_Y - opening.height]} />
+          <Damask w={opening.width} h={ENTABLATURE_Y - opening.height} tint={tint} />
         </mesh>
       ) : null}
 
-      <Cornice length={length} height={height} />
+      <mesh geometry={stone}>
+        <StoneMaterial tint={1.18} />
+      </mesh>
+      {label ? <FriezeName label={label} length={length} /> : null}
 
       {/*
         Shadow where the wall meets the floor: the dark line a real room
@@ -260,7 +297,7 @@ function Wall({
         work out for itself.
       */}
       {runs.map((run) => (
-        <mesh key={`ao${run.x}`} position={[run.x, 0.004, 0.62]} rotation={[-Math.PI / 2, 0, 0]}>
+        <mesh key={`ao${run.x}`} position={[run.x, 0.006, 0.62]} rotation={[-Math.PI / 2, 0, 0]}>
           <planeGeometry args={[run.len, 1.1]} />
           <meshBasicMaterial color="#000000" map={floorShadow()} transparent opacity={0.5} depthWrite={false} />
         </mesh>
@@ -293,175 +330,128 @@ function floorShadow() {
 }
 
 /* ------------------------------------------------------------------ */
-/* Pilasters                                                           */
-/* ------------------------------------------------------------------ */
-
-/** A square section with its arrises chamfered, extruded upward. */
-function useChamferedColumn(size: number, chamfer: number, height: number) {
-  const geo = useMemo(() => {
-    const h = size / 2;
-    const c = chamfer;
-    const s = new THREE.Shape();
-    s.moveTo(-h + c, -h);
-    s.lineTo(h - c, -h);
-    s.lineTo(h, -h + c);
-    s.lineTo(h, h - c);
-    s.lineTo(h - c, h);
-    s.lineTo(-h + c, h);
-    s.lineTo(-h, h - c);
-    s.lineTo(-h, -h + c);
-    s.closePath();
-    const g = new THREE.ExtrudeGeometry(s, { depth: height, bevelEnabled: false });
-    g.rotateX(-Math.PI / 2);
-    return g;
-  }, [size, chamfer, height]);
-  useEffect(() => () => geo.dispose(), [geo]);
-  return geo;
-}
-
-const PIL = 0.8;
-
-function Pilaster({ x, z, tint }: { x: number; z: number; tint: string }) {
-  const shaftH = ROOM_H - 0.95 - 0.84;
-  const shaft = useChamferedColumn(PIL, 0.07, shaftH);
-  const block = useChamferedColumn(PIL + 0.22, 0.05, 0.84);
-  const cap = useChamferedColumn(PIL + 0.22, 0.05, 0.22);
-  return (
-    <group position={[x, 0, z]}>
-      <mesh geometry={block}>
-        <meshStandardMaterial color={STONE_DARK} roughness={0.58} metalness={0.12} envMapIntensity={0.6} />
-      </mesh>
-      <mesh geometry={shaft} position={[0, 0.84, 0]}>
-        <meshStandardMaterial color={shade(tint, 0.08)} roughness={0.88} metalness={0} envMapIntensity={0.35} />
-      </mesh>
-      {/* the capital, a plain abacus under the cornice with a bronze fillet beneath it */}
-      <mesh geometry={cap} position={[0, ROOM_H - 0.95, 0]}>
-        <meshStandardMaterial color={shade(tint, 0.14)} roughness={0.86} metalness={0} envMapIntensity={0.35} />
-      </mesh>
-      <mesh position={[0, ROOM_H - 0.98, 0]}>
-        <boxGeometry args={[PIL + 0.06, 0.05, PIL + 0.06]} />
-        <meshStandardMaterial color={MID.bronze} roughness={0.38} metalness={0.9} envMapIntensity={1.1} />
-      </mesh>
-    </group>
-  );
-}
-
-/* ------------------------------------------------------------------ */
 /* Ceiling                                                             */
 /* ------------------------------------------------------------------ */
 
 /** How far the coffers go up into the slab. */
-const COFFER_D = 0.5;
-const BEAM_W = 0.7;
+const COFFER_D = 0.6;
+/** The beams between them, in two steps: a broad shallow one and a narrow one below it. */
+const BEAM_STEPS = [
+  { w: 0.9, d: 0.3 },
+  { w: 0.5, d: COFFER_D },
+];
 
-/** One beam's section: a plain soffit with its two lower arrises chamfered. */
-function beamSection() {
-  const h = BEAM_W / 2;
-  const c = 0.09;
-  const s = new THREE.Shape();
-  s.moveTo(-h, COFFER_D);
-  s.lineTo(-h, c);
-  s.lineTo(-h + c, 0);
-  s.lineTo(h - c, 0);
-  s.lineTo(h, c);
-  s.lineTo(h, COFFER_D);
-  s.closePath();
-  return s;
-}
+/** How many coffers across a span, about four metres each. */
+const cofferCount = (span: number) => Math.max(2, Math.round(span / 4.2));
 
-/**
- * The beams of the coffered ceiling, merged into a single mesh: one draw
- * call for the whole grid however many coffers it makes. Room-local, with
- * the soffit at y = 0.
- */
+/** The coffer grid's beams, merged: room-local, with the soffit at y = 0. */
 function useBeams(depth: number, width: number) {
   const geo = useMemo(() => {
     const parts: THREE.BufferGeometry[] = [];
-    const section = beamSection();
-    const along = (length: number, at: number, axis: "x" | "z") => {
-      const g = new THREE.ExtrudeGeometry(section, { depth: length, bevelEnabled: false });
-      g.translate(0, 0, -length / 2);
-      if (axis === "x") {
-        // runs along x, sitting at z = at
+    const nx = cofferCount(depth);
+    const nz = cofferCount(width);
+    for (const { w, d } of BEAM_STEPS) {
+      const section = (len: number) => {
+        // a beam hanging from the slab, its lower arrises chamfered
+        const c = Math.min(0.06, w / 6);
+        const s = new THREE.Shape([
+          new THREE.Vector2(-w / 2, COFFER_D),
+          new THREE.Vector2(-w / 2, COFFER_D - d + c),
+          new THREE.Vector2(-w / 2 + c, COFFER_D - d),
+          new THREE.Vector2(w / 2 - c, COFFER_D - d),
+          new THREE.Vector2(w / 2, COFFER_D - d + c),
+          new THREE.Vector2(w / 2, COFFER_D),
+        ]);
+        const g = new THREE.ExtrudeGeometry(s, { depth: len, bevelEnabled: false });
+        g.translate(0, 0, -len / 2);
+        return g;
+      };
+      for (let k = 0; k <= nz; k += 1) {
+        // along the depth (x), at a point across the width
+        const g = section(depth);
         g.rotateY(Math.PI / 2);
-        g.translate(0, 0, at);
-      } else {
-        g.translate(at, 0, 0);
+        g.translate(0, 0, -width / 2 + (width * k) / nz);
+        parts.push(g.toNonIndexed());
+        g.dispose();
       }
-      parts.push(g.toNonIndexed());
-      g.dispose();
-    };
-    // five coffers across the width, four along the depth, and a frame round the edge
-    // coffers of about four units, across the width and along the depth, and a frame round the edge
-    const across = Math.max(2, Math.round(width / 4.8));
-    const along_ = Math.max(2, Math.round(depth / 5));
-    for (let k = 0; k <= across; k += 1) along(depth, -width / 2 + (width * k) / across, "x");
-    for (let k = 0; k <= along_; k += 1) along(width, -depth / 2 + (depth * k) / along_, "z");
-    const merged = mergeGeometries(parts, false);
+      for (let k = 0; k <= nx; k += 1) {
+        const g = section(width);
+        g.translate(-depth / 2 + (depth * k) / nx, 0, 0);
+        parts.push(g.toNonIndexed());
+        g.dispose();
+      }
+    }
+    const all = mergeGeometries(parts, false);
     for (const p of parts) p.dispose();
-    return merged;
+    // darker up toward the slab, where the coffers hold their shadow
+    return worldUV(bake(all, (q) => 0.5 + 0.5 * ease(COFFER_D, 0, q.y)), 2.6);
   }, [depth, width]);
-  useEffect(() => () => geo?.dispose(), [geo]);
+  useEffect(() => () => geo.dispose(), [geo]);
   return geo;
 }
 
 /**
- * A coffered ceiling, with warm light slots let into it.
+ * A coffered ceiling, the middle coffers glazed as a laylight.
  *
- * The flat dark slab overhead read as a void: a black band across the top
- * of every frame with nothing in it. Coffers give it depth that the light
- * from the room catches, and the slots give the light somewhere to come
- * from - the exhibit spotlights hang in the one over the exhibits.
+ * The coffers give the ceiling a depth the room's light catches. Over the
+ * middle of the room the slab gives way to glass, lit from above, the way
+ * a picture gallery is lit by day: the light that seems to fill the room
+ * comes down from there, and the spotlights for the work hang in a slot
+ * along the back.
  */
 function CofferedCeiling({ door, tint }: { door: DoorSpec; tint: string }) {
   const [cx, cz] = roomCenter(door);
   const { depth, width } = roomSize(door);
   const beams = useBeams(depth, width);
-  const dir = door.side === "left" ? -1 : 1;
+  const glass = useMemo(() => getLaylight(), []);
   const slot = slotX(door) - cx;
-  const sideSlotZ = width / 2 - 3.6;
+  const panes = useMemo(() => {
+    const nx = cofferCount(depth);
+    const nz = cofferCount(width);
+    const out: { x: number; z: number; w: number; d: number }[] = [];
+    for (let i = 0; i < nx; i += 1) {
+      for (let j = 0; j < nz; j += 1) {
+        const x = -depth / 2 + (depth * (i + 0.5)) / nx;
+        const z = -width / 2 + (width * (j + 0.5)) / nz;
+        // the middle of the room, clear of the spotlight slot along the back
+        if (Math.abs(x) < depth * 0.3 && Math.abs(z) < width * 0.3) {
+          out.push({ x, z, d: depth / nx - BEAM_STEPS[0].w, w: width / nz - BEAM_STEPS[0].w });
+        }
+      }
+    }
+    return out;
+  }, [depth, width]);
 
   return (
     <group position={[cx, ROOM_H, cz]}>
       {/* the slab the coffers are cut into: a little self-light, standing in for bounce from below */}
       <mesh position={[0, COFFER_D, 0]} rotation={[Math.PI / 2, 0, 0]}>
         <planeGeometry args={[depth, width]} />
-        <Plaster rx={depth / PLASTER_TILE} ry={width / PLASTER_TILE} tint={shade(tint, -0.1)} glow={0.06} />
+        <Plaster rx={depth / PLASTER_TILE} ry={width / PLASTER_TILE} tint={tone(tint, -0.2)} glow={0.05} />
       </mesh>
-      {beams ? (
-        <mesh geometry={beams}>
-          <meshStandardMaterial
-            color={shade(tint, 0.04)}
-            roughness={0.88}
-            metalness={0}
-            envMapIntensity={0.35}
-            emissive={tint}
-            emissiveIntensity={0.04}
-          />
-        </mesh>
-      ) : null}
+      <mesh geometry={beams}>
+        <StoneMaterial tint={1.1} />
+      </mesh>
 
-      {/* the slots: a dark channel in the slab with a warm line of light inside it */}
-      {[
-        { x: slot, z: 0, len: width - 2, along: "z" as const },
-        { x: -dir * 1.2, z: -sideSlotZ, len: depth - 6, along: "x" as const },
-        { x: -dir * 1.2, z: sideSlotZ, len: depth - 6, along: "x" as const },
-      ].map((s, i) => {
-        const size = (w: number, h: number): [number, number, number] =>
-          s.along === "z" ? [w, h, s.len] : [s.len, h, w];
-        return (
-          <group key={i} position={[s.x, COFFER_D - 0.01, s.z]}>
-            <mesh>
-              <boxGeometry args={size(0.5, 0.02)} />
-              <meshStandardMaterial color={SHELL.recess} roughness={0.95} />
-            </mesh>
-            <mesh position={[0, -0.012, 0]}>
-              <boxGeometry args={size(0.12, 0.012)} />
-              <meshStandardMaterial color={WARM} emissive={WARM} emissiveIntensity={1.5} roughness={0.5} />
-            </mesh>
-          </group>
-        );
-      })}
+      {/* the laylight: obscured glass in a fine grid, lit from above */}
+      {panes.map((p) => (
+        <mesh key={`${p.x},${p.z}`} position={[p.x, COFFER_D - 0.02, p.z]} rotation={[Math.PI / 2, 0, 0]}>
+          <planeGeometry args={[p.d, p.w]} />
+          <meshBasicMaterial color="#8c7756" map={glass} toneMapped={false} />
+        </mesh>
+      ))}
+
+      {/* the spotlight track: a dark slot along the back of the ceiling with a warm line in it */}
+      <group position={[slot, COFFER_D - 0.31, 0]}>
+        <mesh>
+          <boxGeometry args={[0.5, 0.02, width - 2]} />
+          <meshStandardMaterial color={SHELL.recess} roughness={0.95} />
+        </mesh>
+        <mesh position={[0, -0.012, 0]}>
+          <boxGeometry args={[0.12, 0.012, width - 2]} />
+          <meshStandardMaterial color={WARM} emissive={WARM} emissiveIntensity={1.5} roughness={0.5} />
+        </mesh>
+      </group>
     </group>
   );
 }
@@ -470,61 +460,93 @@ function CofferedCeiling({ door, tint }: { door: DoorSpec; tint: string }) {
 /* Floor                                                               */
 /* ------------------------------------------------------------------ */
 
-const BRICK_TILE = 3.2;
-
-/** aoMap reads the second UV channel, which plane geometry does not ship with. */
-function useUv1(geo: THREE.BufferGeometry | null) {
-  useEffect(() => {
-    if (!geo) return;
-    const uv = geo.getAttribute("uv");
-    if (uv && !geo.getAttribute("uv1")) geo.setAttribute("uv1", uv);
-  }, [geo]);
-}
+/** The marble border's breadth inside the walls. */
+const BORDER = 1.1;
+/** The star in the floor: how far forward of the back wall, and how big. */
+const MEDALLION_OUT = 6;
+const MEDALLION_R = 2;
 
 /**
- * The hall's own dark pavers, so a room still reads as part of the
- * building, with the contrast taken down a step - shallower joints and
- * softer occlusion - so the floor stops competing with what stands on it
- * and the exhibit lights can pool on it.
+ * Polished marble, laid in slabs inside a border of a paler stone with a
+ * brass fillet between the two, and a star set into it in front of the
+ * work. Polished, so the lights lie in it; dark, so it never competes with
+ * what stands on it.
  */
 function RoomFloor({ door }: { door: DoorSpec }) {
   const [cx, cz] = roomCenter(door);
   const { depth, width } = roomSize(door);
-  const [geo, setGeo] = useState<THREE.BufferGeometry | null>(null);
-  useUv1(geo);
-  const pbr = useMemo(() => blackBrickFor(depth / BRICK_TILE, width / BRICK_TILE), [depth, width]);
+  const dir = door.side === "left" ? -1 : 1;
+  const field = useMemo(() => marbleFor(depth - BORDER * 2, width - BORDER * 2), [depth, width]);
+  const border = useMemo(() => marbleFor(depth, width), [depth, width]);
+  const star = useMemo(() => getMedallion(), []);
+  const medX = backWallX(door) - dir * MEDALLION_OUT - cx;
+  const polished = (tint: string, pbr: ReturnType<typeof marbleFor>, rough: number) => (
+    <meshStandardMaterial
+      color={tint}
+      map={pbr?.map ?? null}
+      normalMap={pbr?.normalMap ?? null}
+      roughnessMap={pbr?.roughnessMap ?? null}
+      normalScale={new THREE.Vector2(0.3, 0.3)}
+      roughness={rough}
+      metalness={0.05}
+      envMapIntensity={0.7}
+    />
+  );
+  const brass = <meshStandardMaterial color={GOLD.metal} roughness={0.3} metalness={1} envMapIntensity={1.3} />;
   return (
-    <mesh rotation={[-Math.PI / 2, 0, 0]} position={[cx, 0, cz]}>
-      <planeGeometry ref={setGeo} args={[depth, width]} />
-      <meshStandardMaterial
-        color={SHELL.ground}
-        map={pbr?.map ?? null}
-        normalMap={pbr?.normalMap ?? null}
-        roughnessMap={pbr?.roughnessMap ?? null}
-        aoMap={pbr?.aoMap ?? null}
-        aoMapIntensity={0.65}
-        normalScale={new THREE.Vector2(0.32, 0.32)}
-        /* a little glossier in front of the Art wall, so it picks up the wall's glow */
-        roughness={door.id === "art" ? 0.55 : 0.62}
-        metalness={0.14}
-        envMapIntensity={0.45}
-      />
-    </mesh>
+    <group position={[cx, 0, cz]}>
+      {/* the border, one slab under the whole room, with the field laid over its middle */}
+      <mesh rotation={[-Math.PI / 2, 0, 0]}>
+        <planeGeometry args={[depth, width]} />
+        {polished("#8a735c", border, 1)}
+      </mesh>
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.002, 0]}>
+        <planeGeometry args={[depth - BORDER * 2, width - BORDER * 2]} />
+        {polished("#4a3c31", field, 1)}
+      </mesh>
+      {/* the brass fillet between them */}
+      {[-1, 1].map((s) => (
+        <group key={s}>
+          <mesh position={[s * (depth / 2 - BORDER), 0.004, 0]}>
+            <boxGeometry args={[0.035, 0.008, width - BORDER * 2 + 0.035]} />
+            {brass}
+          </mesh>
+          <mesh position={[0, 0.004, s * (width / 2 - BORDER)]}>
+            <boxGeometry args={[depth - BORDER * 2 + 0.035, 0.008, 0.035]} />
+            {brass}
+          </mesh>
+        </group>
+      ))}
+      {/* the star */}
+      {star ? (
+        <mesh rotation={[-Math.PI / 2, 0, 0]} position={[medX, 0.005, 0]}>
+          <circleGeometry args={[MEDALLION_R, 96]} />
+          <meshStandardMaterial
+            map={star.map}
+            metalnessMap={star.metalnessMap}
+            metalness={1}
+            roughness={0.32}
+            envMapIntensity={0.9}
+          />
+        </mesh>
+      ) : null}
+    </group>
   );
 }
 
 /**
- * One gold hairline let into the floor, from the doorway toward the
- * exhibits: a quiet guide line, the only line on the floor.
+ * One gold hairline let into the floor, from the doorway to the star: a
+ * quiet guide line, the only line on the floor.
  */
 function Inlay({ door }: { door: DoorSpec }) {
   const [cx, cz] = roomCenter(door);
   const dir = door.side === "left" ? -1 : 1;
-  const start = cx - dir * (roomSize(door).depth / 2 - 0.6);
-  const end = backWallX(door) - dir * (CASE_INSET + 2.2);
+  const start = cx - dir * (roomSize(door).depth / 2 - BORDER);
+  const end = backWallX(door) - dir * (MEDALLION_OUT + MEDALLION_R + 0.05);
   const len = Math.abs(end - start);
+  if (Math.sign(end - start) !== dir) return null;
   return (
-    <mesh position={[(start + end) / 2, 0.003, cz]}>
+    <mesh position={[(start + end) / 2, 0.006, cz]}>
       <boxGeometry args={[len, 0.006, 0.045]} />
       <meshStandardMaterial
         color={GOLD.metal}
@@ -570,13 +592,13 @@ function FloorSpill({ door }: { door: DoorSpec }) {
   const tex = useMemo(() => spillTexture(), []);
   if (!tex) return null;
   return (
-    <group position={[backWallX(door), 0.006, cz]} rotation={[0, -dir * Math.PI * 0.5, 0]}>
+    <group position={[backWallX(door), 0.008, cz]} rotation={[0, -dir * Math.PI * 0.5, 0]}>
       <mesh position={[0, 0, 3]} rotation={[-Math.PI / 2, 0, 0]} renderOrder={1}>
         <planeGeometry args={[roomSize(door).width - 2, 6]} />
         <meshBasicMaterial
           map={tex}
           transparent
-          opacity={0.2}
+          opacity={0.07}
           blending={THREE.AdditiveBlending}
           depthWrite={false}
           toneMapped={false}
@@ -598,10 +620,11 @@ function FloorSpill({ door }: { door: DoorSpec }) {
  */
 function Portal({ width, height, depth }: { width: number; height: number; depth: number }) {
   const JAMB = 0.18;
-  const reveal = <meshStandardMaterial color={SHELL.recess} roughness={0.72} metalness={0.25} />;
-  const bronze = (
-    <meshStandardMaterial color={GOLD.metal} roughness={0.3} metalness={1} envMapIntensity={1.5} />
+  const grain = useMemo(() => getStoneGrain(), []);
+  const reveal = (
+    <meshStandardMaterial color={tone(SHELL.wall, -0.25)} map={grain?.map ?? null} roughness={0.8} metalness={0.05} />
   );
+  const bronze = <meshStandardMaterial color={GOLD.metal} roughness={0.3} metalness={1} envMapIntensity={1.5} />;
   return (
     <group>
       {[-1, 1].map((s) => (
@@ -685,7 +708,6 @@ function Haze({ door }: { door: DoorSpec }) {
       const from = new THREE.Vector3(...spot.from);
       const to = new THREE.Vector3(...spot.to);
       const dirV = to.clone().sub(from).normalize();
-      // run the beam on to the floor
       /*
         On to the floor - or to the wall, if it gets there first. A beam
         aimed at the wall used to run on through it to the floor behind,
@@ -735,7 +757,14 @@ function Haze({ door }: { door: DoorSpec }) {
 /* ------------------------------------------------------------------ */
 
 /** Past this, a chamber is too far down the hall to be worth drawing. */
-const ROOM_VISIBLE_RANGE = 40;
+const ROOM_VISIBLE_RANGE = 44;
+
+/** Pilasters along a wall `length` long: one near each end, and two more on a long side wall to make three bays. */
+const pilastersFor = (length: number, bays: number) => {
+  const end = length / 2 - 0.8;
+  if (bays <= 1) return [-end, end];
+  return Array.from({ length: bays + 1 }, (_, i) => -end + (2 * end * i) / bays);
+};
 
 function RoomShellInner({ door, entered }: { door: DoorSpec; entered: boolean }) {
   const dir = door.side === "left" ? -1 : 1;
@@ -763,27 +792,49 @@ function RoomShellInner({ door, entered }: { door: DoorSpec; entered: boolean })
   const halfW = width / 2;
   const OPEN_W = DOOR_W + 1.2;
   const OPEN_H = DOOR_H + 0.6;
+  const sidePilasters = useMemo(() => pilastersFor(depth, 3), [depth]);
+  /*
+    The Art room's long walls are divided into seven-metre bays, the first
+    centred seven metres from the back wall, with a pilaster between each
+    pair, so every frame hangs in a bay of its own. A wall's own x runs
+    along the room on one side and against it on the other.
+  */
+  const artPilasters = useMemo(() => {
+    const ds = [0.8];
+    // between the frames, which hang every seven metres from the back wall, the first at seven
+    for (let d = 3.5; d < depth - 3; d += 7) ds.push(d);
+    ds.push(depth - 0.8);
+    const along = (s: number) => ds.map((d) => (s < 0 ? 1 : -1) * dir * (depth / 2 - d));
+    return { minus: along(-1), plus: along(1) };
+  }, [depth, dir]);
+  const backPilasters = useMemo(() => pilastersFor(width, 1), [width]);
 
-  // the same stone, never quite the same colour on two walls
-  const tint = SHELL.wall;
+  // the same silk, never quite the same colour on two walls
   const walls = {
-    back: shade(tint, 0.04),
-    left: shade(tint, -0.03),
-    right: shade(tint, 0.01),
-    front: shade(tint, -0.05),
+    back: tone(SILK, 0.04),
+    left: tone(SILK, -0.03),
+    right: tone(SILK, 0.01),
+    front: tone(SILK, -0.05),
   };
 
   return (
     <group ref={shell}>
-      <Wall position={[backX, 0, cz]} yaw={-dir * Math.PI * 0.5} length={width} height={ROOM_H} tint={walls.back} />
+      <Wall
+        position={[backX, 0, cz]}
+        yaw={-dir * Math.PI * 0.5}
+        length={width}
+        tint={walls.back}
+        pilasterXs={backPilasters}
+        label={door.label}
+      />
       {[-1, 1].map((s) => (
         <Wall
           key={s}
           position={[cx, 0, cz + s * halfW]}
           yaw={s > 0 ? Math.PI : 0}
           length={depth}
-          height={ROOM_H}
           tint={s > 0 ? walls.right : walls.left}
+          pilasterXs={door.id === "art" ? (s > 0 ? artPilasters.plus : artPilasters.minus) : sidePilasters}
         />
       ))}
       <group position={[frontX, 0, cz]} rotation={[0, dir * Math.PI * 0.5, 0]}>
@@ -793,25 +844,14 @@ function RoomShellInner({ door, entered }: { door: DoorSpec; entered: boolean })
         position={[frontX, 0, cz]}
         yaw={dir * Math.PI * 0.5}
         length={width}
-        height={ROOM_H}
         opening={{ width: OPEN_W, height: OPEN_H }}
         tint={walls.front}
       />
 
-      {/*
-        A pilaster in each back corner. Not the front two: they would stand
-        on the corridor's own wall line, so half of each stuck out into the
-        hall as a dark post from floor to ceiling, in every room you had
-        walked into. Nobody sees a room's front corners from inside it.
-      */}
-      {[-1, 1].map((sz) => (
-        <Pilaster key={sz} x={cx + dir * (depth / 2)} z={cz + sz * halfW} tint={tint} />
-      ))}
-
       <RoomFloor door={door} />
       <Inlay door={door} />
       {door.id === "art" ? <FloorSpill door={door} /> : null}
-      <CofferedCeiling door={door} tint={tint} />
+      <CofferedCeiling door={door} tint={SHELL.wall} />
       {entered ? <Haze door={door} /> : null}
     </group>
   );

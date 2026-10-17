@@ -21,6 +21,23 @@ import { useEffect, useRef } from "react";
  */
 
 const MAX_YAW = 0.62; // ~35 degrees each way
+/**
+ * How far the view may turn, and whether it stays where it was turned.
+ * Most rooms are seen from where you stand: a quarter turn at most, and
+ * it eases back when you let go. A room with things on its side walls
+ * (the About room) lets you turn nearly to the walls and stay turned, so
+ * what is there can be looked at and clicked. CameraRig sets this as you
+ * enter and leave a room.
+ */
+const lookRange = { yaw: MAX_YAW, sticky: false };
+let recentre: (() => void) | null = null;
+
+/** Called as a room is entered or left: sets how far you may turn there, and faces you front. */
+export function setLookRoom(wide: boolean) {
+  lookRange.yaw = wide ? 1.45 : MAX_YAW;
+  lookRange.sticky = wide;
+  recentre?.();
+}
 const MAX_PITCH = 0.32;
 /** Past this much movement the gesture is a look, not a click. */
 const DRAG_THRESHOLD = 6;
@@ -38,6 +55,10 @@ export function useLookControls() {
   const look = useRef<LookState>({ yaw: 0, pitch: 0, dragging: false });
 
   useEffect(() => {
+    recentre = () => {
+      look.current.yaw = 0;
+      look.current.pitch = 0;
+    };
     let active = false;
     let lastX = 0;
     let lastY = 0;
@@ -73,7 +94,7 @@ export function useLookControls() {
         This covers the same range in about two hundred.
       */
       const l = look.current;
-      l.yaw = Math.max(-MAX_YAW, Math.min(MAX_YAW, l.yaw - dx * 0.0032));
+      l.yaw = Math.max(-lookRange.yaw, Math.min(lookRange.yaw, l.yaw - dx * 0.0032));
       l.pitch = Math.max(-MAX_PITCH, Math.min(MAX_PITCH, l.pitch - dy * 0.0024));
       if (dragged) document.body.style.cursor = "grabbing";
     };
@@ -91,8 +112,10 @@ export function useLookControls() {
         rather than snapping, and uses a gentler damping for the return
         than for the drag itself.
       */
-      look.current.yaw = 0;
-      look.current.pitch = 0;
+      if (!lookRange.sticky) {
+        look.current.yaw = 0;
+        look.current.pitch = 0;
+      }
       look.current.dragging = false;
 
       document.body.style.cursor = "";
@@ -107,6 +130,7 @@ export function useLookControls() {
     window.addEventListener("pointerup", up);
     window.addEventListener("pointercancel", up);
     return () => {
+      recentre = null;
       window.removeEventListener("pointerdown", down);
       window.removeEventListener("pointermove", move);
       window.removeEventListener("pointerup", up);

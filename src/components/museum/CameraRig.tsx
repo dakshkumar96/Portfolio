@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef } from "react";
+import { useEffect, useRef } from "react";
 import type { RefObject } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
@@ -10,11 +10,12 @@ import {
   CAM_Y,
   HALF_WIDTH,
   doors,
+  roomSize,
   type DoorSpec,
   type RoomId,
 } from "./corridorLayout";
-import { roomView } from "./roomLayout";
-import { useLookControls } from "./lookControls";
+import { roomView, viewDistance } from "./roomLayout";
+import { setLookRoom, useLookControls } from "./lookControls";
 import { markArrived } from "./clickTrace";
 
 /** Where the camera stands in the hall for a given scroll position. */
@@ -142,6 +143,43 @@ export function CameraRig({
   const pos = useRef(new THREE.Vector3(0, CAM_Y, CAM_Z_START));
   const heading = useRef({ yaw: 0, pitch: 0 });
 
+  /* how far from its resting place the visitor has walked in a room, in metres toward the back wall (negative is back toward the door) */
+  const walked = useRef({ target: 0, current: 0 });
+
+  /*
+    Scroll, or the up and down keys, walks you through the room: down or
+    up-arrow goes in toward the far wall, the other way comes back toward
+    the door. It stops a few metres short of each wall. The walk starts
+    from where you stand on arriving, and a new room starts it again.
+  */
+  useEffect(() => {
+    walked.current.target = 0;
+    walked.current.current = 0;
+    const door = roomId ? doors.find((d) => d.id === roomId) : undefined;
+    if (!door) return;
+    const { depth } = roomSize(door);
+    const stand = viewDistance(door);
+    const lo = -(depth - stand - 3);
+    const hi = stand - 5;
+    const move = (m: number) => {
+      walked.current.target = THREE.MathUtils.clamp(walked.current.target + m, lo, hi);
+    };
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      move(e.deltaY * 0.012);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "ArrowDown" || e.key === "s" || e.key === "S") move(1.6);
+      else if (e.key === "ArrowUp" || e.key === "w" || e.key === "W") move(-1.6);
+    };
+    window.addEventListener("wheel", onWheel, { passive: false });
+    window.addEventListener("keydown", onKey);
+    return () => {
+      window.removeEventListener("wheel", onWheel);
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [roomId]);
+
   const route = useRef<Route | null>(null);
   const lastRoom = useRef<RoomId | null>(null);
 
@@ -155,6 +193,8 @@ export function CameraRig({
     if (roomId !== lastRoom.current) {
       const from = lastRoom.current ? doors.find((d) => d.id === lastRoom.current) : undefined;
       lastRoom.current = roomId;
+      // each room sets how far you may turn; going in or out starts you facing front
+      setLookRoom(roomId === "about" || roomId === "experience" || roomId === "art");
 
       const keys: Key[] = [{ pos: pos.current.clone(), ...heading.current }];
 
@@ -212,9 +252,12 @@ export function CameraRig({
         onArrive?.(flight.to);
       }
     } else if (door) {
-      // arrived: hold the room's viewing position exactly
+      // arrived: hold the room's viewing position, moved by however far you have walked
       const view = roomView(door);
-      pos.current.set(...view.position);
+      const w = walked.current;
+      w.current = THREE.MathUtils.damp(w.current, w.target, 4, delta);
+      const toward = door.side === "left" ? -1 : 1;
+      pos.current.set(view.position[0] + toward * w.current, view.position[1], view.position[2]);
       const sight = headingOf(pos.current, new THREE.Vector3(...view.look));
       heading.current.yaw = windNear(sight.yaw, heading.current.yaw);
       heading.current.pitch = sight.pitch;
@@ -237,6 +280,17 @@ export function CameraRig({
       if (Math.abs(heading.current.yaw) < 1e-4) heading.current.yaw = 0;
     }
 
+    /*
+      A fixed view for automated screenshots: only when a test browser has
+      set window.__peek. Nothing a visitor does sets it, so for everyone
+      else this is a single property read that finds nothing.
+    */
+    const peek = (window as unknown as { __peek?: number[] }).__peek;
+    if (peek) {
+      pos.current.set(peek[0], peek[1], peek[2]);
+      heading.current.yaw = peek[3];
+      heading.current.pitch = peek[4] ?? 0.05;
+    }
     camera.position.copy(pos.current);
     const { yaw, pitch } = heading.current;
     const aim = scratch.current.aim.set(
