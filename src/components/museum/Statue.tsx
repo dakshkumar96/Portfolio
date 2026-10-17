@@ -1,107 +1,145 @@
 "use client";
 
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import * as THREE from "three";
 import { RoundedBox } from "@react-three/drei";
+import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { MID } from "./palette";
+import { buildFigure } from "./figure";
+import { gildedLettering } from "./inscriptions";
 
 /**
  * The statue at the end of the hall, on its plinth.
  *
- * What stands on the plinth now is a stand-in: a plain standing figure in
- * pale marble, so the end of the hall has its subject and its light and
- * the proportions can be judged. It is deliberately one group, `Figure`,
- * with nothing else depending on its shape. To put the real statue there,
- * replace `<Figure />` with the model, standing on y = 0 with its feet at
- * the origin and about 3.3 units tall; the plinth, the light over it and
- * the wall behind need no change.
+ * The figure is carved from the shape of a man as he appears in his
+ * photographs (see figure.ts), at about twice life size, in one block of
+ * pale marble, with his name cut in the plinth under him.
+ *
+ * A likeness of a face cannot be made by hand from a few numbers, so the
+ * figure that stands is /museum/statue.glb, a model made from his
+ * photographs: the body from the London Tech Week photo, the head from a
+ * close crop of the same photo, its proportions corrected toward his face
+ * as measured across ten photographs, and joined at the collar. The model
+ * is baked one unit tall with its origin between the feet. It takes the
+ * same marble, so it reads as stone. If the file is missing, the carved
+ * figure stands instead.
+ *
+ * In the photo his hand rests on a letter. The statue is re-posed to stand
+ * on its own, the way the brief for it asks: a relaxed stance with both
+ * arms hanging at his sides, one elbow a little bent, the torso turned
+ * about ten degrees and the head inclined a few degrees back toward the
+ * visitor. Each joint was turned about a pivot placed from the photo's
+ * pose landmarks. Nothing in his hands, nothing to lean on.
  */
 
 export const PLINTH_H = 1.45;
+/** How tall the figure stands on the plinth: about twice life size. */
+const FIGURE_H = 3.3;
+const SCAN = "/museum/statue.glb";
 
 const MARBLE = "#ece4d2";
 
-function Figure() {
-  // the body: a robe that flares to the ground, narrows at the waist, and rises to the shoulders
-  const body = useMemo(() => {
-    const spine = new THREE.SplineCurve(
-      [
-        [0.66, 0],
-        [0.64, 0.1],
-        [0.54, 0.55],
-        [0.42, 1.1],
-        [0.33, 1.55],
-        [0.29, 1.85],
-        [0.34, 2.05],
-        [0.36, 2.2],
-        [0.29, 2.32],
-        [0.11, 2.4],
-        [0.1, 2.46],
-      ].map(([r, y]) => new THREE.Vector2(r, y)),
-    );
-    const g = new THREE.LatheGeometry(spine.getPoints(90), 96);
-    /*
-      Drapery. A lathe is a plain solid of revolution, so the robe is
-      given folds by pushing each ring in and out round its circumference,
-      deepest low down where cloth gathers and gone by the chest, and
-      twisting a little as it rises so the folds do not run straight.
-    */
-    const p = g.getAttribute("position");
-    for (let i = 0; i < p.count; i += 1) {
-      const x = p.getX(i);
-      const y = p.getY(i);
-      const z = p.getZ(i);
-      const r = Math.hypot(x, z);
-      if (r < 1e-4) continue;
-      const a = Math.atan2(z, x);
-      const gather = Math.max(0, 1 - y / 1.9);
-      const k = 1 + gather * (0.07 * Math.sin(9 * a + y * 2.4) + 0.035 * Math.sin(17 * a - y * 1.3));
-      p.setXYZ(i, x * k, y, z * k);
-    }
-    g.computeVertexNormals();
+let marbleMaterial: THREE.MeshStandardMaterial | null = null;
+/** Statuary marble: pale, a little warm, with a soft polish. */
+export function marble() {
+  if (!marbleMaterial) {
+    marbleMaterial = new THREE.MeshStandardMaterial({
+      color: MARBLE,
+      roughness: 0.42,
+      metalness: 0,
+      envMapIntensity: 0.8,
+      emissive: new THREE.Color("#ffd9a0"),
+      /* a little of its own light, so that at the far end of the hall it is the brightest thing in the frame */
+      emissiveIntensity: 0.16,
+      // the open overshirt is a single sheet of stone, seen from both sides
+      side: THREE.DoubleSide,
+    });
+  }
+  return marbleMaterial;
+}
+
+/** The carved figure, scaled to its height on the plinth. */
+function Carved() {
+  const geometry = useMemo(() => {
+    const g = buildFigure();
+    g.computeBoundingBox();
+    const h = g.boundingBox ? g.boundingBox.max.y - g.boundingBox.min.y : 1.8;
+    const k = FIGURE_H / h;
+    g.scale(k, k, k);
+    g.translate(0, -(g.boundingBox?.min.y ?? 0) * k, 0);
     return g;
   }, []);
-  useEffect(() => () => body.dispose(), [body]);
+  useEffect(() => () => geometry.dispose(), [geometry]);
+  return <mesh geometry={geometry} material={marble()} castShadow receiveShadow dispose={null} />;
+}
 
-  const marble = (
-    <meshStandardMaterial
-      color={MARBLE}
-      roughness={0.46}
-      metalness={0}
-      envMapIntensity={0.8}
-      emissive="#ffd9a0"
-      emissiveIntensity={0.03}
-    />
-  );
+/**
+ * A scan, if one has been saved: looked for once, and loaded only if it
+ * is there, so a missing file costs one small request and nothing else.
+ */
+function useScan() {
+  const [scan, setScan] = useState<THREE.Object3D | null>(null);
+  useEffect(() => {
+    let alive = true;
+    fetch(SCAN, { method: "HEAD" })
+      .then((r) => {
+        if (!r.ok || !alive) return;
+        new GLTFLoader().load(
+          SCAN,
+          (gltf) => {
+            if (!alive) return;
+            const root = gltf.scene;
+            // the model is baked with its origin between the feet: scale it to the figure's height and stand its soles on the plinth
+            const box = new THREE.Box3().setFromObject(root);
+            const size = box.getSize(new THREE.Vector3());
+            const k = size.y > 0 ? FIGURE_H / size.y : 1;
+            root.scale.setScalar(k);
+            root.position.set(0, -box.min.y * k, 0);
+            root.traverse((o) => {
+              const m = o as THREE.Mesh;
+              if (m.isMesh) {
+                m.material = marble();
+                m.castShadow = true;
+                m.receiveShadow = true;
+              }
+            });
+            setScan(root);
+          },
+          undefined,
+          () => {},
+        );
+      })
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, []);
+  return scan;
+}
+
+/** His name, cut in the face of the plinth and gilded. */
+function Name() {
+  const tex = useMemo(() => gildedLettering("DAKSH KUMAR", { width: 1024, height: 160, cap: 58, tracking: 0.32 }), []);
+  useEffect(() => () => tex.dispose(), [tex]);
   return (
-    <group rotation={[0, -0.18, 0]} scale={1.12}>
-      <mesh geometry={body}>{marble}</mesh>
-      {/* the shoulders, wider than the chest */}
-      <mesh position={[0, 2.22, 0]} scale={[1.45, 0.52, 0.8]}>
-        <sphereGeometry args={[0.3, 40, 20]} />
-        {marble}
-      </mesh>
-      {/* the arms, down the sides, a little away from the body */}
-      {[-1, 1].map((s) => (
-        <mesh key={s} position={[s * 0.47, 1.62, 0.02]} rotation={[0, 0, s * 0.07]}>
-          <capsuleGeometry args={[0.085, 1.0, 8, 20]} />
-          {marble}
-        </mesh>
-      ))}
-      <mesh position={[0, 2.5, 0]}>
-        <cylinderGeometry args={[0.1, 0.12, 0.18, 24]} />
-        {marble}
-      </mesh>
-      {/* the head, turned a little and lifted */}
-      <mesh position={[0, 2.72, 0]} rotation={[-0.06, 0.32, 0]} scale={[0.86, 1.1, 0.96]}>
-        <sphereGeometry args={[0.2, 40, 28]} />
-        {marble}
-      </mesh>
-    </group>
+    <mesh position={[0, 0.18 + (PLINTH_H - 0.5) / 2, 0.851]}>
+      <planeGeometry args={[1.5, (1.5 * 160) / 1024]} />
+      <meshStandardMaterial
+        map={tex}
+        alphaTest={0.35}
+        roughness={0.3}
+        metalness={1}
+        envMapIntensity={1.4}
+        emissive="#7a5418"
+        emissiveMap={tex}
+        emissiveIntensity={0.6}
+      />
+    </mesh>
   );
 }
 
 export function Statue({ position }: { position: [number, number, number] }) {
+  const scan = useScan();
   const stone = <meshStandardMaterial color="#9a8a70" roughness={0.78} metalness={0} envMapIntensity={0.45} />;
   return (
     <group position={position}>
@@ -120,9 +158,16 @@ export function Statue({ position }: { position: [number, number, number] }) {
         <boxGeometry args={[1.76, 0.035, 1.76]} />
         <meshStandardMaterial color={MID.bronze} roughness={0.38} metalness={0.9} envMapIntensity={1.1} />
       </mesh>
-      <group position={[0, PLINTH_H, 0]}>
-        <Figure />
-      </group>
+      <Name />
+      {scan ? (
+        <group position={[0, PLINTH_H, 0]}>
+          <primitive object={scan} />
+        </group>
+      ) : (
+        <group position={[0, PLINTH_H, 0]}>
+          <Carved />
+        </group>
+      )}
     </group>
   );
 }
