@@ -32,8 +32,6 @@ export const categories = [
   { slug: "blogs", label: "Blogs" },
 ] as const;
 
-export type CategorySlug = (typeof categories)[number]["slug"];
-
 export type Project = {
   slug: string;
   title: string;
@@ -112,24 +110,22 @@ export const projects: Project[] = [
     repo: "https://github.com/dakshkumar96/Sakha",
   },
   {
-    slug: "sentinel",
-    title: "Sentinel",
-    oneLiner: "Agentic spend guardian. Built in 24 hours.",
+    slug: "agents-of-deception",
+    title: "Agents of Deception",
+    oneLiner: "Eight language-model agents in a Traitors-style house: who lies, and does anything change inside the model?",
     summary:
-      "A hackathon product from the Cursor AdTech Hackathon in London. Real-time budget monitoring, anomaly detection, brand safety, and human-in-the-loop gates, streaming from Claude with tool use.",
-    tags: ["AI", "Dev", "Product"],
-    stack: ["Next.js", "TypeScript", "Claude API", "SSE"],
+      "My BSc final year project at Royal Holloway, supervised by Kostas Stathis. Eight language-model agents live in a house: most are told to be honest, two are secretly told to deceive, and two get no persona at all. Each cycle they play Iterated Prisoner's Dilemma rounds against each other, talk, and vote someone out. The question is whether patterns linked to trust and betrayal show up inside the model as well as in its words. It measures patterns, not feelings, and makes no claim that the agents hold genuine states.",
+    tags: ["Research", "AI"],
+    stack: ["Python", "Ollama", "HuggingFace", "TransformerLens", "FastAPI"],
     highlights: [
-      "End-to-end in 24 hours",
-      "Streaming tool use with Claude",
-      "Anomaly detection and brand safety checks",
-      "Built alongside engineers from Meta",
+      "Eight agents: two Traitors, six Faithful, with a no-persona baseline",
+      "An Iterated Prisoner's Dilemma tournament under every trust decision",
+      "Probes internal activations to see whether they predict the next move beyond history and messages",
+      "Extends Curvo (2025) and Sobotka et al. (2026)",
     ],
-    featured: false,
-    year: "2026",
-    status: "Hackathon",
-    live: "https://sentinel-kohl-ten.vercel.app",
-    repo: "https://github.com/dakshkumar96/Sentinel",
+    featured: true,
+    year: "2026–2027",
+    status: "Final year project",
   },
   {
     slug: "reclaim",
@@ -154,13 +150,13 @@ export const projects: Project[] = [
     title: "Visual Work",
     oneLiner: "Posters, thumbnails, and a consistent identity for a student society.",
     summary:
-      "I treated society comms and Palmy AI like products, with one visual system across everything. Posters, reels, podcast thumbnails, SEO packaging. Instagram 400 → 750. Video reach +30%.",
+      "I treated society comms and Palmy AI like products, with one visual system across everything. Posters, reels, podcast thumbnails, SEO packaging. Instagram 400 → 850. Video reach +30%.",
     tags: ["Design"],
     stack: ["Photoshop", "Canva", "Premiere Pro"],
     highlights: [
       "International Society visual identity and event campaigns",
       "Palmy AI podcast packaging, trailers, and thumbnails",
-      "Instagram 400 → 750 followers (85%)",
+      "Instagram 400 → 850 followers (112%)",
       "Video reach up 30% after full SEO setup",
     ],
     featured: false,
@@ -196,7 +192,7 @@ export const experience: Experience[] = [
     role: "President",
     dates: "May 2026 – Present",
     bullets: [
-      "Running the society now. Spent the year before as social media manager, grew the Instagram by 85%, planned events, designed the posters and reels, kept the content calendar alive.",
+      "Running the society now. Spent the year before as social media manager, grew the Instagram by 112%, planned events, designed the posters and reels, kept the content calendar alive.",
     ],
   },
   {

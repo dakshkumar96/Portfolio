@@ -46,14 +46,26 @@ const ART: Record<string, ReactNode> = {
       </text>
     </>
   ),
-  sentinel: (
+  "agents-of-deception": (
     <>
       <rect width="400" height="180" fill="#121212" />
-      <rect x="40" y="40" width="320" height="100" rx="16" fill="#1c1c1c" />
-      <rect x="58" y="62" width="180" height="8" rx="4" fill="#f16a4b" />
-      <rect x="58" y="82" width="240" height="8" rx="4" fill="#333" />
-      <rect x="58" y="102" width="120" height="8" rx="4" fill="#333" />
-      <circle cx="330" cy="90" r="22" fill="#f16a4b" />
+      {/* eight residents round a table; two of them are not what they seem */}
+      <circle cx="200" cy="90" r="46" fill="none" stroke="#333" strokeWidth="2" />
+      {Array.from({ length: 8 }, (_, i) => {
+        const a = (i / 8) * Math.PI * 2 - Math.PI / 2;
+        const traitor = i === 2 || i === 5;
+        return (
+          <circle
+            key={i}
+            cx={200 + Math.cos(a) * 46}
+            cy={90 + Math.sin(a) * 46}
+            r="10"
+            fill={traitor ? "#f16a4b" : "#2a2a2a"}
+            stroke={traitor ? "none" : "#555"}
+          />
+        );
+      })}
+      <path d="M170 90 h60 M200 60 v60" stroke="#f5f5f5" strokeWidth="1.5" opacity="0.2" />
     </>
   ),
   reclaim: (
