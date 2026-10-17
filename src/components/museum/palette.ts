@@ -73,8 +73,8 @@ export const GOLD = {
   metal: "#c9a227",
   /** Brighter gold for edges catching direct light. */
   metalLit: "#e8c565",
-  /** The near-white core of anything that emits. */
-  core: "#fff3d4",
+  /** The core of anything that emits: the warmest white there is, never pure white. */
+  core: "#ffe3b0",
   /** The saturated halo around that core. */
   halo: "#ffb63f",
   /** Warm light colour, roughly 2700K. */
