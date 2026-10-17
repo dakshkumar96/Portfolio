@@ -3,6 +3,7 @@
 import { memo, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode, RefObject } from "react";
 import { Canvas, useFrame } from "@react-three/fiber";
+import { PerformanceMonitor } from "@react-three/drei";
 import * as THREE from "three";
 import { CameraRig } from "./CameraRig";
 import { Corridor } from "./Corridor";
@@ -13,12 +14,14 @@ import { EnvLight } from "./EnvLight";
 import { ATMOSPHERE } from "./palette";
 
 import { Vitrine, type VitrineShape } from "./Vitrine";
-import { PortraitWall, ArtWall } from "./PortraitWall";
+import { PortraitWall, ArtWall, TextStand } from "./PortraitWall";
+import { SidePosters } from "./ExhibitionPosters";
 import { ROOM_ICON_FOR } from "./roomIcons";
 import { PerfHud } from "./PerfHud";
 import { hasDebugFlag } from "./debug";
 import { consumedDrag } from "./lookControls";
 import { compileProgress } from "./loadProgress";
+import { settled } from "./preload";
 import {
   CAM_FOV,
   CAM_Z_START,
@@ -27,8 +30,8 @@ import {
   roomCenter,
   type RoomId,
 } from "./corridorLayout";
-import { exhibitsByRoom, type ExhibitDatum } from "./exhibitData";
-import { CASE_SCALE, caseSlots } from "./roomLayout";
+import { artBoards, exhibitsByRoom, type ExhibitDatum } from "./exhibitData";
+import { CASE_SCALE, aboutCaseSlots, artBoardSlots, caseSlots, experienceSlots } from "./roomLayout";
 
 const SHAPES: VitrineShape[] = ["icosahedron", "octahedron", "torus", "sphere", "box"];
 
@@ -63,6 +66,53 @@ const WARM_BATCH = 3;
  * flight at a time; the next starts when it resolves, so the queue
  * drains as fast as the driver allows and never faster.
  */
+const nextFrames = (n: number) =>
+  new Promise<void>((resolve) => {
+    const step = (left: number) => (left <= 0 ? resolve() : requestAnimationFrame(() => step(left - 1)));
+    step(n);
+  });
+
+/**
+ * The last of loading, behind the veil: wait for the photographs and
+ * posters to be prepared (preload.ts), let them reach their materials,
+ * compile any program that changed when a picture arrived, and upload
+ * every texture to the GPU now - rooms that are out of sight included -
+ * so that nothing anywhere in the museum is compiled or uploaded on the
+ * frame that first shows it.
+ */
+async function finishLoading(gl: THREE.WebGLRenderer, scene: THREE.Scene, camera: THREE.Camera) {
+  await settled();
+  await nextFrames(4);
+  const meshes: THREE.Object3D[] = [];
+  scene.traverse((o) => {
+    if ((o as THREE.Mesh).isMesh) meshes.push(o);
+  });
+  const all = {
+    traverse: (cb: (o: THREE.Object3D) => void) => meshes.forEach(cb),
+    traverseVisible: (cb: (o: THREE.Object3D) => void) => meshes.forEach(cb),
+  } as unknown as THREE.Object3D;
+  try {
+    await gl.compileAsync(all, camera, scene);
+  } catch {
+    // a program that will not compile here will not compile later either; carry on
+  }
+  const uploaded = new Set<THREE.Texture>();
+  for (const o of meshes) {
+    const material = (o as THREE.Mesh).material;
+    const mats = Array.isArray(material) ? material : [material];
+    for (const m of mats) {
+      for (const value of Object.values(m)) {
+        const t = value as THREE.Texture | null;
+        if (t && t.isTexture && !uploaded.has(t)) {
+          uploaded.add(t);
+          gl.initTexture(t);
+        }
+      }
+    }
+  }
+  await nextFrames(2);
+}
+
 function WarmShaders({
   settled,
   done,
@@ -136,7 +186,7 @@ function WarmShaders({
       quiet.current += 1;
       if (settled && quiet.current > 45 && !finished.current) {
         finished.current = true;
-        done();
+        finishLoading(gl, scene, camera).then(done, done);
       }
       return;
     }
@@ -204,11 +254,61 @@ function RoomContentsInner({
 
   const items = exhibitsByRoom[roomId] ?? [];
 
-  // About is a picture gallery, not a vitrine hall: framed photographs on
-  // a plain wall, each opening its own text.
+  const sgn = door.side === "left" ? -1 : 1;
+
+  // About is a picture gallery: framed photographs on the wall, each
+  // opening its own text, and a case either side for the record behind
+  // them - education on one hand, awards on the other.
   if (roomId === "about") {
+    const cased = items.slice(5, 7);
+    const sides = aboutCaseSlots(door);
     return (
-      <PortraitWall door={door} items={items} activeId={activeId} onSelect={onSelect} />
+      <group>
+        <PortraitWall door={door} items={items} activeId={activeId} onSelect={onSelect} />
+        <CaseRow
+          items={cased}
+          slots={sides.map((s) => s.position)}
+          yaws={sides.map((s) => s.yaw)}
+          sgn={sgn}
+          roomId={roomId}
+          activeId={activeId}
+          onSelect={onSelect}
+        />
+      </group>
+    );
+  }
+
+  /*
+    The Experience room: a role in each case, with the company under its
+    name - three across the back, two on each side wall - and a board of
+    text between the cases at the back, as in the About room.
+  */
+  if (roomId === "experience") {
+    const { cases, boards } = experienceSlots(door);
+    const boardYaw = sgn > 0 ? -Math.PI / 2 : Math.PI / 2;
+    return (
+      <group>
+        <CaseRow
+          items={items.slice(0, 9)}
+          slots={cases.map((c) => c.position)}
+          yaws={cases.map((c) => c.yaw)}
+          sgn={sgn}
+          roomId={roomId}
+          activeId={activeId}
+          onSelect={onSelect}
+        />
+        {items.slice(9, 11).map((exhibit, i) => (
+          <TextStand
+            key={exhibit.id}
+            number={`No. ${["I", "II"][i]}`}
+            position={boards[i]}
+            rotation={[0, boardYaw, 0]}
+            exhibit={exhibit}
+            active={activeId === exhibit.id}
+            onSelect={() => onSelect(exhibit)}
+          />
+        ))}
+      </group>
     );
   }
 
@@ -223,22 +323,161 @@ function RoomContentsInner({
     walk along, not one to sit in front of.
   */
   if (roomId === "art") {
-    return <ArtWall door={door} items={items} activeId={activeId} onSelect={onSelect} />;
+    const boardYaw = sgn > 0 ? -Math.PI / 2 : Math.PI / 2;
+    return (
+      <group>
+        <ArtWall door={door} items={items} activeId={activeId} onSelect={onSelect} />
+        <SidePosters door={door} activeId={activeId} onSelect={onSelect} />
+        {/* the two boards either side of the wall, as in the About room */}
+        {artBoards.map((exhibit, i) => (
+          <TextStand
+            key={exhibit.id}
+            number={`No. ${["I", "II"][i]}`}
+            position={artBoardSlots(door)[i]}
+            rotation={[0, boardYaw, 0]}
+            scale={1.2}
+            exhibit={exhibit}
+            active={activeId === exhibit.id}
+            onSelect={() => onSelect(exhibit)}
+          />
+        ))}
+      </group>
+    );
   }
 
-  const sgn = door.side === "left" ? -1 : 1;
   /*
     Set against the back wall, not stranded in the middle of the room,
     fanned along it at one pitch. The positions come from roomLayout, so
     the spotlights over the cases and the camera framing them agree with
     where they actually stand.
   */
-  const slots = caseSlots(door, items.length);
+  return (
+    <CaseRow items={items} slots={caseSlots(door, items.length)} sgn={sgn} roomId={roomId} activeId={activeId} onSelect={onSelect} />
+  );
+}
 
+/**
+ * A name broken into the fewest lines that keep each to about `chars`
+ * letters, balanced so the longest is as short as it can be: "Marketing
+ * Coordinator" becomes two lines, not "Marketing" and a stray word.
+ */
+function wrapLines(text: string, chars: number): string[] {
+  const words = text.split(/\s+/).filter(Boolean);
+  if (words.length <= 1 || text.length <= chars) return [text];
+  const n = words.length;
+  const len = (a: number, b: number) => words.slice(a, b).join(" ").length;
+  let best: string[] = [text];
+  let bestScore = Infinity;
+  // every way to cut the words into 2 or 3 lines
+  const tryCuts = (cuts: number[]) => {
+    const edges = [0, ...cuts, n];
+    const parts = edges.slice(0, -1).map((e, i) => words.slice(e, edges[i + 1]).join(" "));
+    const longest = Math.max(...parts.map((p) => p.length));
+    // fewer lines are better unless the longest is too long to read at size
+    const score = longest + (parts.length - 1) * Math.max(chars * 0.45, 4) + (longest > chars ? (longest - chars) * 3 : 0);
+    if (score < bestScore) {
+      bestScore = score;
+      best = parts;
+    }
+  };
+  for (let i = 1; i < n; i += 1) {
+    tryCuts([i]);
+    for (let j = i + 1; j < n; j += 1) tryCuts([i, j]);
+  }
+  void len;
+  return best;
+}
+
+/** About how wide a line of the label's capitals is, as a multiple of its height, from the letters in it. */
+const labelAspect = (chars: number) => 0.49 * chars + 0.43;
+/** The label's room: the inset panel on the plinth face, less its moulding. */
+const LABEL_W = 1.6;
+const LABEL_H = 1.04;
+
+/**
+ * The name on the plinth: the role in large capitals over the
+ * organisation in smaller ones, set in as many lines as the words need
+ * and centred in the panel. Every line of a name is the same size, the
+ * largest at which its longest line still fits the panel.
+ */
+function PlinthLabel({
+  title,
+  company,
+  active,
+  onSelect,
+}: {
+  title: string;
+  company?: string;
+  active: boolean;
+  onSelect: () => void;
+}) {
+  const titleLines = wrapLines(title, 10);
+  const companyLines = company ? wrapLines(company, 14) : [];
+  const fit = (lines: string[], top: number) => Math.min(top, LABEL_W / labelAspect(Math.max(...lines.map((l) => l.length))));
+  let ht = fit(titleLines, 0.4);
+  let hc = companyLines.length ? fit(companyLines, 0.26) : 0;
+  // each line takes a little under its canvas height: the canvas carries its own padding
+  const LEAD = 0.62;
+  const GAP = companyLines.length ? 0.2 : 0;
+  const total = (titleLines.length * ht + companyLines.length * hc) * LEAD + GAP;
+  if (total > LABEL_H) {
+    const k = LABEL_H / total;
+    ht *= k;
+    hc *= k;
+  }
+  const block = (titleLines.length * ht + companyLines.length * hc) * LEAD + GAP;
+  let y = block / 2;
+  const rows: { text: string; h: number; y: number }[] = [];
+  titleLines.forEach((text) => {
+    rows.push({ text, h: ht, y: y - (ht * LEAD) / 2 });
+    y -= ht * LEAD;
+  });
+  y -= GAP;
+  companyLines.forEach((text) => {
+    rows.push({ text, h: hc, y: y - (hc * LEAD) / 2 });
+    y -= hc * LEAD;
+  });
+  return (
+    <group>
+      {rows.map((r, i) => (
+        <ExhibitText
+          key={i}
+          text={r.text}
+          position={[0, r.y, 0]}
+          height={r.h}
+          maxWidth={LABEL_W}
+          active={active}
+          onSelect={onSelect}
+        />
+      ))}
+    </group>
+  );
+}
+
+/** A row of vitrines, each with its label on the front of the plinth. */
+function CaseRow({
+  items,
+  slots,
+  yaws,
+  sgn,
+  roomId,
+  activeId,
+  onSelect,
+}: {
+  items: ExhibitDatum[];
+  slots: [number, number, number][];
+  /** Which way each case faces; the default is out from the back wall. */
+  yaws?: number[];
+  sgn: number;
+  roomId: RoomId;
+  activeId: string | null;
+  onSelect: (exhibit: ExhibitDatum) => void;
+}) {
   return (
     <group>
       {items.map((exhibit, i) => {
         const p = slots[i];
+        const yaw = yaws?.[i] ?? -sgn * Math.PI * 0.5;
         const isActive = activeId === exhibit.id;
         return (
           /* the case and its label, scaled together about the foot of the plinth */
@@ -253,7 +492,7 @@ function RoomContentsInner({
                     : SHAPES[i % SHAPES.length]
               }
               icon={ROOM_ICON_FOR[exhibit.id]}
-              faceYaw={-sgn * Math.PI * 0.5}
+              faceYaw={yaw}
               seed={i}
               active={isActive}
               onSelect={() => onSelect(exhibit)}
@@ -275,14 +514,8 @@ function RoomContentsInner({
               lit by the room, unobstructed, and at the height you drop
               your eyes to after looking at the piece.
             */}
-            <group position={[-sgn * 1.085, 0.86, 0]} rotation={[0, -sgn * Math.PI * 0.5, 0]}>
-              <ExhibitText
-                text={exhibit.title}
-                position={[0, 0, 0]}
-                height={0.26}
-                active={isActive}
-                onSelect={() => onSelect(exhibit)}
-              />
+            <group position={[Math.sin(yaw) * 1.085, 0.86, Math.cos(yaw) * 1.085]} rotation={[0, yaw, 0]}>
+              <PlinthLabel title={exhibit.title} company={exhibit.company} active={isActive} onSelect={() => onSelect(exhibit)} />
             </group>
           </group>
         );
@@ -325,30 +558,38 @@ export function MuseumCanvas({
     room rather than a void, and the next visit is free. The three most
     recent are kept; older ones are pulled down.
   */
+  /*
+    Every room is raised while the loading veil is still up, one at a time
+    so no single frame carries more than one, and none is ever pulled
+    down again. A click on a door then costs a camera move and nothing
+    else: the room, its pictures and its shaders are all already there.
+  */
   const [built, setBuilt] = useState<RoomId[]>([]);
   const keep = useCallback((id: RoomId) => {
-    setBuilt((list) => (list[0] === id ? list : [id, ...list.filter((r) => r !== id)].slice(0, 3)));
+    setBuilt((list) => (list.includes(id) ? list : [...list, id]));
   }, []);
+  useEffect(() => {
+    if (built.length >= doors.length) return;
+    const next = doors.find((d) => !built.includes(d.id));
+    if (!next) return;
+    const t = window.setTimeout(() => keep(next.id), 260);
+    return () => window.clearTimeout(t);
+  }, [built, keep]);
 
   /*
-    The room whose lights are on, and the room the camera has finished
-    walking into. Both trail the click: the lights stay up while you walk
-    back out and only go down once you are in the hall, and the room's
-    lens settles only once you have stopped.
+    The room whose lights are on. It trails the click: the lights stay up
+    while you walk back out and only go down once you are in the hall.
   */
   const [lightsFor, setLightsFor] = useState<RoomId | null>(null);
-  const [arrived, setArrived] = useState<RoomId | null>(null);
   const [seenRoom, setSeenRoom] = useState<RoomId | null>(null);
   if (roomId !== seenRoom) {
     setSeenRoom(roomId);
-    setArrived(null);
     if (roomId) {
       setLightsFor(roomId);
-      setBuilt((list) => (list[0] === roomId ? list : [roomId, ...list.filter((r) => r !== roomId)].slice(0, 3)));
+      setBuilt((list) => (list.includes(roomId) ? list : [...list, roomId]));
     }
   }
   const handleArrive = useCallback((room: RoomId | null) => {
-    setArrived(room);
     if (!room) setLightsFor(null);
   }, []);
 
@@ -366,11 +607,23 @@ export function MuseumCanvas({
     the compile queue drained.
   */
   const warmed = useRef(false);
+  const [running, setRunning] = useState(false);
   const announce = () => {
     if (warmed.current) return;
     warmed.current = true;
+    setRunning(true);
     onReady();
   };
+
+  /*
+    Resolution: never more than 1.5 device pixels per CSS pixel - every
+    effect in the stack is full-screen, so this cost goes with the square
+    of it, and past 1.5 the difference cannot be seen. Once the museum is
+    running, a laptop that cannot hold its frame rate steps down toward 1,
+    and back up when it can; after a few changes either way it settles.
+  */
+  const maxDpr = useMemo(() => Math.min(1.5, window.devicePixelRatio || 1), []);
+  const [dpr, setDpr] = useState(maxDpr);
 
   return (
     <Canvas
@@ -400,7 +653,7 @@ export function MuseumCanvas({
         more pixels than 1.5 for a difference you cannot see on a
         high-density display.
       */
-      dpr={[1, 2]}
+      dpr={dpr}
       gl={{ antialias: true, powerPreference: "high-performance" }}
       /* a click on bare wall or floor puts the open card away; the end of a drag to look round does not */
       onPointerMissed={(e) => {
@@ -412,6 +665,14 @@ export function MuseumCanvas({
         gl.outputColorSpace = THREE.SRGBColorSpace;
       }}
     >
+      {running ? (
+        <PerformanceMonitor
+          flipflops={4}
+          onDecline={() => setDpr((d) => Math.max(1, d - 0.25))}
+          onIncline={() => setDpr((d) => Math.min(maxDpr, d + 0.25))}
+          onFallback={() => setDpr(1)}
+        />
+      ) : null}
       <color attach="background" args={[ATMOSPHERE.background]} />
       <fogExp2 attach="fog" args={[ATMOSPHERE.background, ATMOSPHERE.fogDensity]} />
 
@@ -452,7 +713,7 @@ export function MuseumCanvas({
           ),
         )}
 
-        <WarmShaders settled done={announce} rescan={built.join(",")} />
+        <WarmShaders settled={built.length >= doors.length} done={announce} rescan={built.join(",")} />
 
       </Suspense>
 
@@ -469,7 +730,7 @@ export function MuseumCanvas({
       {debug ? <PerfHud /> : null}
 
       <CameraRig progressRef={progressRef} roomId={roomId} onArrive={handleArrive} />
-      <Effects roomId={arrived} />
+      <Effects />
     </Canvas>
   );
 }

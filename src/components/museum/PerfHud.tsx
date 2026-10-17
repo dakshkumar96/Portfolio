@@ -86,6 +86,8 @@ export function PerfHud() {
       this every frame costs nothing and is idempotent.
     */
     gl.info.autoReset = false;
+    // debug only (this HUD mounts under ?debug): the scene, for inspecting from the console
+    (window as unknown as { __museum?: unknown }).__museum = { scene, gl };
 
     const a = acc.current;
     const ms = delta * 1000;

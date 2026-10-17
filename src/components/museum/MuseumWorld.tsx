@@ -296,9 +296,11 @@ export function MuseumWorld() {
               ← Back to corridor
             </button>
           </div>
-        ) : (
-          <p className={`museum-tip${active ? " hidden" : ""}`}>Click a door to enter a room</p>
-        )}
+        ) : null}
+        {/* every case, frame, board and logo opens a card, not only the doors: say so */}
+        <p className={`museum-tip${active ? " hidden" : ""}`}>
+          {room ? "Click anything to read about it" : "Click a door to enter a room, or anything else to read about it"}
+        </p>
 
         {/*
           Placards stay in the DOM so they remain crawlable and

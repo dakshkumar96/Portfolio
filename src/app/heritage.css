@@ -560,14 +560,30 @@
   outline-offset: 3px;
 }
 
-/* the hint is something scribbled, not an instruction from an interface */
+/* the hint, in the shared label style: the same face, size and tracking as every other label, on SOUND OFF's baseline */
 .museum-tip {
-  font-family: var(--font-hand), cursive;
-  font-size: 26px;
-  letter-spacing: 0;
-  text-transform: none;
-  color: #d9bb82;
-  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.7);
+  bottom: 32px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  font-family: var(--font-plex-mono), ui-monospace, "SFMono-Regular", Menlo, monospace;
+  font-size: 11px;
+  line-height: 1;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #b89a72;
+  opacity: 0.75;
+  text-shadow: none;
+}
+
+.museum-tip::before {
+  content: "";
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #5ad1d6;
+  opacity: 0.5;
 }
 
 @media (prefers-reduced-motion: reduce) {

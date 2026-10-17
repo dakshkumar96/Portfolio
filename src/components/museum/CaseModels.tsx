@@ -249,6 +249,10 @@ function GLBModel({
       mesh.material = mats.map((mat) => {
         const std = (mat as THREE.MeshStandardMaterial).clone() as THREE.MeshStandardMaterial;
         std.envMapIntensity = 1.35;
+        // a screen or any emissive part stays well below the statue's brightness, which is the brightest point in the hall
+        if (std.emissiveMap || (std.emissive && std.emissive.getHex() > 0x111111)) {
+          std.emissiveIntensity = Math.min(std.emissiveIntensity, 0.4);
+        }
 
         if (tintBody) {
           /*

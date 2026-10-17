@@ -1,3 +1,4 @@
+import { track } from "./preload";
 /**
  * The About wall's photographs, brought into the museum's palette.
  *
@@ -23,11 +24,19 @@ export type PhotoCrop = {
   focus: [number, number];
   /** How far in from the widest 4:5 crop: 1 is the widest, 2 is half as wide. */
   zoom: number;
+  /**
+   * Print the whole photograph, uncut and at its own proportions, as large
+   * as it came (up to WHOLE_MAX on its long side), rather than a 4:5 crop.
+   */
+  whole?: boolean;
 };
 
-/* the print, 4:5 */
-const OUT_W = 768;
-const OUT_H = 960;
+/** A whole print's long side, at most: sharp at any distance the museum hangs it. */
+const WHOLE_MAX = 1600;
+
+/* a cropped print, 4:5 */
+const OUT_W_CROP = 768;
+const OUT_H_CROP = 960;
 
 const COLOUR_KEPT = 0.45;
 const MAP_MIX = 0.55;
@@ -123,7 +132,7 @@ const pause = () => new Promise<void>((done) => setTimeout(done, 0));
 /** How long one slice of the work may hold the main thread, in ms. */
 const SLICE_MS = 6;
 
-async function print(src: string, { focus, zoom }: PhotoCrop) {
+async function print(src: string, { focus, zoom, whole }: PhotoCrop) {
   const img = new Image();
   img.decoding = "async";
   img.src = src;
@@ -131,12 +140,17 @@ async function print(src: string, { focus, zoom }: PhotoCrop) {
   const w = img.naturalWidth;
   const h = img.naturalHeight;
 
-  // the widest 4:5 window, narrowed by the zoom, centred on the focus and kept inside the picture
+  // the widest 4:5 window, narrowed by the zoom, centred on the focus and kept inside the picture - or all of it
   const z = Math.max(1, zoom);
-  const cw = (w / h < 0.8 ? w : h * 0.8) / z;
-  const ch = cw * 1.25;
+  const cw = whole ? w : (w / h < 0.8 ? w : h * 0.8) / z;
+  const ch = whole ? h : cw * 1.25;
   const sx = clamp(focus[0] * w - cw / 2, 0, w - cw);
   const sy = clamp(focus[1] * h - ch / 2, 0, h - ch);
+  const scale = whole ? Math.min(1, WHOLE_MAX / Math.max(w, h)) : 1;
+  const OUT_W = whole ? Math.round(w * scale) : OUT_W_CROP;
+  const OUT_H = whole ? Math.round(h * scale) : OUT_H_CROP;
+  // a whole print is shown large: a finer grain, so it stays crisp
+  const grainAmount = whole ? GRAIN * 0.45 : GRAIN;
 
   const canvas = document.createElement("canvas");
   canvas.width = OUT_W;
@@ -194,7 +208,7 @@ async function print(src: string, { focus, zoom }: PhotoCrop) {
       seed ^= seed << 13;
       seed ^= seed >>> 17;
       seed ^= seed << 5;
-      const grain = ((seed >>> 0) / 4294967296 - 0.5) * 2 * GRAIN * 255;
+      const grain = ((seed >>> 0) / 4294967296 - 0.5) * 2 * grainAmount * 255;
       d[i] = curve[Math.round(clamp(px[0], 0, 1) * 1023)] * vig + grain;
       d[i + 1] = curve[Math.round(clamp(px[1], 0, 1) * 1023)] * vig + grain;
       d[i + 2] = curve[Math.round(clamp(px[2], 0, 1) * 1023)] * vig + grain;
@@ -211,10 +225,10 @@ const prints = new Map<string, Promise<HTMLCanvasElement>>();
  * canvas ready to become a texture. Made once per photograph and crop.
  */
 export function gradedPhoto(src: string, crop: PhotoCrop) {
-  const key = `${src}|${crop.focus.join(",")}|${crop.zoom}`;
+  const key = `${src}|${crop.focus.join(",")}|${crop.zoom}|${crop.whole ? "whole" : ""}`;
   let p = prints.get(key);
   if (!p) {
-    p = print(src, crop);
+    p = track(print(src, crop));
     // a missing file is not remembered, so adding it later just works
     p.catch(() => prints.delete(key));
     prints.set(key, p);
@@ -295,7 +309,7 @@ const exacts = new Map<string, Promise<HTMLCanvasElement>>();
 export function exactPrint(src: string) {
   let p = exacts.get(src);
   if (!p) {
-    p = exact(src);
+    p = track(exact(src));
     p.catch(() => exacts.delete(src));
     exacts.set(src, p);
   }
