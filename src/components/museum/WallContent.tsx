@@ -1,33 +1,9 @@
 "use client";
 
-import { useEffect, useRef } from "react";
 import * as THREE from "three";
 import { GOLD, MID, SHELL } from "./palette";
 import { HALF_WIDTH as HW, WALL_H, Z_NEAR, Z_FAR } from "./corridorLayout";
-import { projects, experience, skills, site, about } from "@/content/site";
-
-/**
- * The lines carved into the walls, drawn from the real site content so
- * the hall is inscribed with this person's record rather than filler.
- */
-export function inscriptionLines(): string[] {
-  const out: string[] = [
-    site.name,
-    site.role,
-    site.location,
-  ];
-  for (const job of experience) {
-    out.push(`${job.org} — ${job.role}`, job.dates);
-  }
-  for (const project of projects) {
-    out.push(project.title, project.stack.slice(0, 3).join(" · "));
-  }
-  for (const group of skills) {
-    out.push(group.title, group.items.slice(0, 5).join(" · "));
-  }
-  out.push(...about.whoIAm.map((p) => p.split(".")[0]));
-  return out.filter(Boolean);
-}
+import { VirtualSpot } from "./lightPool";
 
 /**
  * The cove lighting that runs the length of the hall.
@@ -72,31 +48,19 @@ export const CORNER_STATIONS: number[] = (() => {
 export const LAMP_DROP = 1.5;
 export const LAMP_REACH = 1.6;
 
-/** A downward spot, with its target bound into the scene graph. */
+/** A downward spot: virtual, lit by the pool while it matters (lightPool.tsx). */
 function SpotDown({ y, intensity }: { y: number; intensity: number }) {
-  const lightRef = useRef<THREE.SpotLight>(null);
-  const targetRef = useRef<THREE.Object3D>(null);
-  useEffect(() => {
-    const l = lightRef.current;
-    const t = targetRef.current;
-    if (!l || !t) return;
-    l.target = t;
-    t.updateMatrixWorld();
-  }, []);
   return (
-    <>
-      <spotLight
-        ref={lightRef}
-        position={[0, y, 0]}
-        angle={1.15}
-        penumbra={0.95}
-        intensity={intensity}
-        color={GOLD.light}
-        distance={16}
-        decay={2}
-      />
-      <object3D ref={targetRef} position={[0, y - 4, 0]} />
-    </>
+    <VirtualSpot
+      position={[0, y, 0]}
+      target={[0, y - 4, 0]}
+      angle={1.15}
+      penumbra={0.95}
+      intensity={intensity}
+      color="#ffcf94"
+      distance={16}
+      decay={2}
+    />
   );
 }
 
@@ -170,28 +134,50 @@ export function WallLamp({
 
       {/* the globe, and the filament visible through it */}
       <mesh position={[0, -0.2, 0]}>
-        <sphereGeometry args={[0.17, 24, 24]} />
+        <sphereGeometry args={[0.115, 24, 24]} />
         <meshStandardMaterial
-          color="#fff6e2"
-          emissive={GOLD.core}
-          emissiveIntensity={2.4}
+          color="#ffcf94"
+          emissive="#ffcf94"
+          emissiveIntensity={1.45}
           roughness={0.55}
           transparent
           opacity={0.92}
         />
       </mesh>
       <mesh position={[0, -0.2, 0]}>
-        <sphereGeometry args={[0.06, 12, 12]} />
+        <sphereGeometry args={[0.042, 12, 12]} />
         <meshStandardMaterial
-          color={GOLD.core}
-          emissive={GOLD.core}
-          emissiveIntensity={4.5}
+          color="#ffcf94"
+          emissive="#ffcf94"
+          emissiveIntensity={2.7}
         />
       </mesh>
 
       {lightless ? null : <SpotDown y={-0.26} intensity={intensity} />}
     </group>
   );
+}
+
+let wash: THREE.Texture | null = null;
+/** The light of a cove on the wall below it: bright at the cornice, falling away down the wall, nothing at the foot. */
+function coveWash() {
+  if (wash) return wash;
+  const c = document.createElement("canvas");
+  c.width = 4;
+  c.height = 128;
+  const ctx = c.getContext("2d");
+  if (ctx) {
+    const g = ctx.createLinearGradient(0, 0, 0, 128);
+    g.addColorStop(0, "rgb(255,255,255)");
+    g.addColorStop(0.18, "rgb(190,190,190)");
+    g.addColorStop(0.55, "rgb(60,60,60)");
+    g.addColorStop(1, "rgb(0,0,0)");
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, 4, 128);
+  }
+  wash = new THREE.CanvasTexture(c);
+  wash.colorSpace = THREE.SRGBColorSpace;
+  return wash;
 }
 
 export function WallInscriptions() {
@@ -228,15 +214,17 @@ export function WallInscriptions() {
               it appears to give is the diffuser, not a row of lamps.
             */}
             {/* under the cornice, so it lights the cornice's underside instead of vanishing inside it */}
-            <mesh position={[sgn * (HW - 0.2), WALL_H - 1.05, midZ]}>
-              <boxGeometry args={[0.035, 0.07, runLen]} />
-              <meshStandardMaterial
-                color="#fff4e0"
-                emissive={GOLD.core}
-                emissiveIntensity={1.9}
-                roughness={0.6}
+            {/* a cove light, hidden: its light only, washed up the wall under the cornice, with no line drawn */}
+            <mesh position={[sgn * (HW - 0.03), WALL_H - 1.5, midZ]} rotation={[0, yaw, 0]} renderOrder={1}>
+              <planeGeometry args={[runLen, 1.45]} />
+              <meshBasicMaterial
+                map={coveWash()}
+                color="#e0b070"
                 transparent
-                opacity={0.94}
+                opacity={0.3}
+                blending={THREE.AdditiveBlending}
+                depthWrite={false}
+                toneMapped={false}
               />
             </mesh>
             {/*
@@ -268,7 +256,7 @@ export function WallInscriptions() {
                 position={[sgn * (HW - LAMP_REACH), WALL_H - LAMP_DROP, z]}
                 yaw={sgn > 0 ? 0 : Math.PI}
                 lightless={i % 2 === 1}
-                intensity={240}
+                intensity={145}
               />
             ))}
 
