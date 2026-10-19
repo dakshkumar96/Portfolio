@@ -96,11 +96,28 @@ export function LightPool() {
       Array.from({ length: POOL_SIZE }, () => {
         const l = new THREE.SpotLight("#ffffff", 0);
         l.decay = 2;
+        l.distance = 1;
+        l.position.set(0, -60, 0);
         return l;
       }),
     [],
   );
-  const targets = useMemo(() => lights.map(() => new THREE.Object3D()), [lights]);
+  /*
+    A spotlight aimed at its own position has no direction, and the shader
+    turns that into NaN - which survives being multiplied by zero intensity
+    and comes out as flashing white blocks once bloom spreads it. So an
+    idle light is never left at the origin aimed at the origin: it waits
+    below the floor, pointing down, out of reach of anything.
+  */
+  const targets = useMemo(
+    () =>
+      lights.map(() => {
+        const t = new THREE.Object3D();
+        t.position.set(0, -70, 0);
+        return t;
+      }),
+    [lights],
+  );
   const slots = useRef(lights.map(() => ({ id: 0, level: 0 })));
 
   useEffect(() => {
@@ -157,6 +174,10 @@ export function LightPool() {
       const v = slot.id ? registry.get(slot.id) : undefined;
       if (!v) {
         light.intensity = 0;
+        light.distance = 1;
+        light.position.set(0, -60, 0);
+        targets[i].position.set(0, -70, 0);
+        targets[i].updateMatrixWorld();
         return;
       }
       v.anchor.getWorldPosition(light.position);

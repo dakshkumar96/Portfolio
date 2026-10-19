@@ -165,6 +165,8 @@ export function CameraRig({
       walked.current.target = THREE.MathUtils.clamp(walked.current.target + m, lo, hi);
     };
     const onWheel = (e: WheelEvent) => {
+      // over an open card, or anything else on the page, the wheel scrolls that, not the walk
+      if (!(e.target instanceof HTMLCanvasElement)) return;
       e.preventDefault();
       move(e.deltaY * 0.012);
     };

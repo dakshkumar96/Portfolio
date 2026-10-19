@@ -363,7 +363,8 @@ export function MuseumWorld() {
                     )}
                   </div>
                 ) : null}
-                {exhibit.actions?.length ? (
+                {/* only links that go somewhere: a project with no live site and no public code shows none */}
+                {exhibit.actions?.some((action) => action.href) ? (
                   <div className="cat-actions">
                     {/* a note in the margin, with an arrow drawn by hand */}
                     <span className="cat-note" aria-hidden="true">
@@ -379,8 +380,9 @@ export function MuseumWorld() {
                         />
                       </svg>
                     </span>
-                    {exhibit.actions.map((action) =>
-                      action.href ? (
+                    {exhibit.actions
+                      .filter((action) => action.href)
+                      .map((action) => (
                         <a
                           key={action.label}
                           className="cat-action"
@@ -400,17 +402,7 @@ export function MuseumWorld() {
                             />
                           </svg>
                         </a>
-                      ) : (
-                        <span
-                          key={action.label}
-                          className="cat-action is-off"
-                          aria-disabled="true"
-                          title="Not public"
-                        >
-                          {action.label}
-                        </span>
-                      ),
-                    )}
+                      ))}
                   </div>
                 ) : null}
                 <div className="cat-end">

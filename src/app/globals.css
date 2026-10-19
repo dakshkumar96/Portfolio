@@ -1203,3 +1203,8 @@ a {
   border-color: var(--accent);
   color: var(--text-primary);
 }
+
+/* the museum draws its own sky: the page's falling stars would only show through it as white flecks while it fades in */
+body:has(.museum-root) .starfield {
+  display: none;
+}

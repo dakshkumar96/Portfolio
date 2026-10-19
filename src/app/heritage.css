@@ -100,9 +100,25 @@
     0 30px 80px rgba(0, 0, 0, 0.7),
     inset 0 1px 0 rgba(232, 197, 101, 0.22),
     inset 0 0 60px rgba(14, 7, 3, 0.55);
-  scrollbar-width: thin;
-  scrollbar-color: rgba(184, 147, 90, 0.4) transparent;
+  /* a visible scrollbar, in brass on a faint track, so a long card reads as one you can scroll */
+  scrollbar-width: auto;
+  scrollbar-color: rgba(220, 192, 138, 0.8) rgba(255, 240, 210, 0.07);
   animation: heritage-in 0.5s ease;
+}
+
+.museum-placards .museum-exhibit-card.is-active::-webkit-scrollbar {
+  width: 10px;
+}
+
+.museum-placards .museum-exhibit-card.is-active::-webkit-scrollbar-track {
+  margin: 18px 0;
+  background: rgba(255, 240, 210, 0.07);
+  border-radius: 10px;
+}
+
+.museum-placards .museum-exhibit-card.is-active::-webkit-scrollbar-thumb {
+  background: rgba(220, 192, 138, 0.8);
+  border-radius: 10px;
 }
 
 @keyframes heritage-in {
@@ -424,15 +440,6 @@
 
 .museum-placards a.cat-action:hover svg {
   transform: translate(1.5px, -1.5px);
-}
-
-.museum-placards .cat-action.is-off {
-  color: rgba(205, 183, 143, 0.4);
-  background: rgba(60, 41, 26, 0.35);
-  border-color: rgba(138, 106, 68, 0.35);
-  outline-color: rgba(220, 192, 138, 0.16);
-  box-shadow: none;
-  cursor: default;
 }
 
 /* a note in the margin, with an arrow drawn by hand */
