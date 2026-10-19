@@ -137,8 +137,8 @@ export const experienceExhibits: ExhibitDatum[] = [
   // across the back
   role("president", "President", "International Society, Royal Holloway", "Part-time · May 2026 – Present", [
     "Launched a digital membership system with Apple Wallet cards, giving members discounts at local stores and guaranteed interviews with partner job agencies.",
-    "Introduced a post-event feedback form to capture what is working, what is not, and what events members actually want to see next.",
-    "Lead a team of 8 committee members, coordinating day-to-day society operations.",
+    "Run the society like a startup, with events nobody on campus had done before: the Night of Nations, a Cultural Fashion Show and a go-karting Rush Rally, many of them with the International Community and the other cultural societies.",
+    "Lead a committee of 10, coordinating day-to-day society operations.",
   ]),
   role("nextround", "Founding Product Engineer", "NextRound", "Part-time · Oct 2026 – Present · Hybrid", [
     "Joined as one of the first engineers at an early-stage startup building evidence-based hiring, helping companies judge candidates on what they can actually do rather than just their CV, and work directly with the CEO on the core product.",
@@ -195,7 +195,7 @@ export const experienceExhibits: ExhibitDatum[] = [
     title: "In Figures",
     meta: "The roles, read as numbers",
     body:
-      "He leads a committee of eight and works a three-level pub with a staff of around eighty. His research reached 100% empirical coverage against a 90% target on 34 held-out real stars.",
+      "He leads a committee of ten and works a three-level pub with a staff of around eighty. His research reached 100% empirical coverage against a 90% target on 34 held-out real stars.",
   },
 ];
 
@@ -502,9 +502,9 @@ export const hallExhibits: ExhibitDatum[] = [
     id: "hall-flight",
     room: "about",
     title: "The Flight Over",
-    meta: "Photograph. On the way to the United Kingdom, aged 17",
+    meta: "Photograph. On the way to the United Kingdom",
     body:
-      "Daksh at seventeen, on the flight to the UK. He made the journey alone, leaving a small town in Sindh, Pakistan, for a country where he did not know a single person. Most of what hangs in this museum came after this flight.",
+      "Daksh on the flight to the UK. He made the journey alone, leaving a small town in Sindh, Pakistan, for a country where he did not know a single person. Most of what hangs in this museum came after this flight.",
   },
 ];
 

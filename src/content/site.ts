@@ -17,13 +17,13 @@ AI Engineer, in Training @ Royal Holloway
 RAG systems, harness engineering, fine-tuned models
 dakshkumar2k2@gmail.com
 https://linkedin.com/in/dakshkumar96`,
-  bio: "Final year CS student, specialised in AI. Left a small town in Pakistan at 17 to study in the UK, and now spend most of my time on things that don't fully exist yet: RAG systems, harness engineering, fine-tuned models. Also decent with people, somehow, and weirdly attached to SQL.",
+  bio: "Final year CS student, specialised in AI. Left a small town in Pakistan to study in the UK, and now spend most of my time on things that don't fully exist yet: RAG systems, harness engineering, fine-tuned models. Also decent with people, somehow, and weirdly attached to SQL.",
 };
 
 export const homeAbout = {
   heading: "About Me",
   paragraph:
-    "CS student, AI focused, came to the UK alone at 17 from Pano Aqil, a small town in Sindh, Pakistan. I like working on RAG systems, harness engineering and fine-tuning models more than most people like their hobbies. Good with people too, comms and soft skills aren't an afterthought for me. And yes, SQL is genuinely one of my favourite things to write.",
+    "CS student, AI focused, came to the UK alone from Pano Aqil, a small town in Sindh, Pakistan. I like working on RAG systems, harness engineering and fine-tuning models more than most people like their hobbies. Good with people too, comms and soft skills aren't an afterthought for me. And yes, SQL is genuinely one of my favourite things to write.",
 };
 
 export const categories = [
@@ -300,13 +300,13 @@ export const about = {
   curve: "Who Am I?",
   kicker: "About Me",
   intro:
-    "Final year computer science student at Royal Holloway, specialised in AI. I spend most of my time on RAG systems, agentic engineering and fine-tuning models. Came to the UK at seventeen, left a small town behind. Good with people, better with SQL than I probably should be.",
+    "Final year computer science student at Royal Holloway, specialised in AI. I spend most of my time on RAG systems, agentic engineering and fine-tuning models. Came to the UK on my own from a small town. Good with people, better with SQL than I probably should be.",
   lookingFor:
     "Currently looking for AI engineering, machine learning engineering, or AI software engineering roles.",
   whoIAm: [
     "First touched a computer at 6, got my first personal laptop at 12. Started video editing at 13, and was freelancing and earning off it by 15, same year I started coding, and it's been the same feeling ever since: watching one small line do something, then watching that line turn into a whole system, built out of what's basically just English.",
     "Started using AI chatbots the day it launched. Kept going deeper from there, into machine learning, model behaviour, all of it, and it's turned into the thing I care about most now. That pull led to research on estimating exoplanet orbital parameters with ML.",
-    "At 17 I got on a flight to the UK alone, didn't know a single person here, coming from a small town in Pakistan. That's more or less been the pattern since: do the thing that scares you, learn from what breaks.",
+    "I got on a flight to the UK alone, didn't know a single person here, coming from a small town in Pakistan. That's more or less been the pattern since: do the thing that scares you, learn from what breaks.",
     "I've done a lot of things since: design, bartending, social media, student ambassador work. But the thing my heart actually loves is building tools that solve a problem I've hit myself, or watched someone around me hit. That's the thread running through everything I build. Sakha, a voice-first AI companion built on the Bhagavad Gita, and Threshold, a visa-sponsorship job matcher for international students, both came out of problems people around me were actually facing.",
     "I meditate daily and journal every night, mostly to keep myself honest about where I actually am versus where I think I am. Outside of coding and AI I'm bartending, running the International Society as president, occasionally doing student ambassador and hall life work, and watching movies or listening to whatever music I'm into that week, which changes constantly.",
   ],
