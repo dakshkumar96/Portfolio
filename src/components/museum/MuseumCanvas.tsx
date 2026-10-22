@@ -2,9 +2,11 @@
 
 import { memo, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode, RefObject } from "react";
-import { Canvas, useFrame } from "@react-three/fiber";
+import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { PerformanceMonitor } from "@react-three/drei";
 import * as THREE from "three";
+// before any material is compiled: no pixel leaves a shader as NaN (see shaderGuard)
+import "./shaderGuard";
 import { CameraRig } from "./CameraRig";
 import { Corridor } from "./Corridor";
 import { Effects } from "./Effects";
@@ -21,7 +23,7 @@ import { PerfHud } from "./PerfHud";
 import { hasDebugFlag } from "./debug";
 import { consumedDrag } from "./lookControls";
 import { compileProgress } from "./loadProgress";
-import { settled } from "./preload";
+import { drawEverything, settled } from "./preload";
 import {
   CAM_FOV,
   CAM_Z_START,
@@ -36,41 +38,88 @@ import { CASE_SCALE, aboutCaseSlots, artBoardSlots, caseSlots, experienceSlots }
 const SHAPES: VitrineShape[] = ["icosahedron", "octahedron", "torus", "sphere", "box"];
 
 /**
- * How many materials to hand the driver in one asynchronous batch.
+ * The most materials handed to the driver in one asynchronous batch.
  *
- * Small on purpose. `compileAsync` lets the driver link off-thread, but
- * before that Three still builds each program's shader source on the
- * main thread, and that part does not move. A batch of twelve was
- * measured producing twenty programs in a single frame; three keeps the
- * synchronous half of the work down to something a frame can absorb.
+ * Generous on purpose. Most materials share a program with one already
+ * compiled and cost nothing; the rest are linked by the driver on its
+ * own threads, side by side, so the more it is given at once the sooner
+ * it is done. Three builds each new program's source on the main
+ * thread first, a few milliseconds each, which a hidden scene can spare.
  */
-const WARM_BATCH = 3;
+const WARM_BATCH = 48;
+
+/** Main-thread time a loading frame may spend sending textures to the GPU while the shaders compile. */
+const UPLOAD_MS = 10;
 
 /**
- * Compile every material up front, in batches, off the main thread.
- *
- * Measurement settled what this is for: every frame slow enough to be
- * felt reported `geometries +0, programs +15`. Never geometry — always
- * shaders. A program must be compiled and linked by the graphics
- * driver, and the synchronous `compile()` blocks until it finishes.
- *
- * Two things make it cheap.
- *
- * A program belongs to a material, not to a mesh, so the queue holds
- * one representative mesh per material it has not seen. Eight hundred
- * meshes share well under two hundred materials, and compiling the
- * other six hundred would be pure repetition.
- *
- * And `compileAsync` uses KHR_parallel_shader_compile, so the driver
- * links off-thread and the frame ends while it works. One batch is in
- * flight at a time; the next starts when it resolves, so the queue
- * drains as fast as the driver allows and never faster.
+ * The longest the hall is held back waiting for its shaders. Past this
+ * it is shown anyway, compiled or not; MuseumWorld lifts the veil a
+ * little later still, so the hall is always there when it does.
  */
+const HOLD_CAP_MS = 24000;
+
 const nextFrames = (n: number) =>
   new Promise<void>((resolve) => {
     const step = (left: number) => (left <= 0 ? resolve() : requestAnimationFrame(() => step(left - 1)));
     step(n);
   });
+
+type DrawItem = { groupOrder: number; renderOrder: number; material: THREE.Material & { id: number }; z: number; id: number };
+
+/**
+ * Solid surfaces drawn shader by shader.
+ *
+ * Three orders them by material, and the hall's eight hundred materials
+ * share forty shaders between them, so walking the list switched shader
+ * over three hundred times a frame - and each switch sends that shader
+ * the camera and all fourteen lamps again, which every step of a walk
+ * changes. Measured, that was most of the time it took to draw a frame
+ * on the move. Grouped by shader, it switches about forty times. Solid
+ * surfaces are depth-tested, so the order they are drawn in changes no
+ * pixel; the see-through ones keep three's back-to-front order.
+ */
+function drawByProgram(gl: THREE.WebGLRenderer) {
+  const programOf = (m: THREE.Material) =>
+    (gl.properties.get(m) as { currentProgram?: { id: number } }).currentProgram?.id ?? 0;
+  gl.setOpaqueSort(
+    (a: DrawItem, b: DrawItem) =>
+      a.groupOrder - b.groupOrder ||
+      a.renderOrder - b.renderOrder ||
+      programOf(a.material) - programOf(b.material) ||
+      a.material.id - b.material.id ||
+      a.z - b.z ||
+      a.id - b.id,
+  );
+}
+
+let warmTarget: THREE.WebGLRenderTarget | null = null;
+
+/**
+ * Compile the programs the museum will actually draw with.
+ *
+ * The scene is never drawn to the screen: it is drawn into the
+ * post-processing chain's buffer, and three builds a different program
+ * for each - one that writes linear colour for a buffer, one that
+ * converts to sRGB for the screen. Compiled with nothing bound, every
+ * material got the screen's version, which nothing ever used, and the
+ * real one was compiled on the frame that first showed it: entering a
+ * room stalled for over a second while its shaders were built. With a
+ * buffer bound while compiling, the program made is the one drawn with.
+ */
+function compileAsDrawn(gl: THREE.WebGLRenderer, object: THREE.Object3D, camera: THREE.Camera, scene: THREE.Scene) {
+  warmTarget ??= new THREE.WebGLRenderTarget(1, 1);
+  const previous = gl.getRenderTarget();
+  // the scene is held hidden while loading, and compile only counts the lights it can see
+  const wasVisible = scene.visible;
+  scene.visible = true;
+  gl.setRenderTarget(warmTarget);
+  try {
+    return gl.compileAsync(object, camera, scene);
+  } finally {
+    gl.setRenderTarget(previous);
+    scene.visible = wasVisible;
+  }
+}
 
 /**
  * The last of loading, behind the veil: wait for the photographs and
@@ -78,9 +127,17 @@ const nextFrames = (n: number) =>
  * compile any program that changed when a picture arrived, and upload
  * every texture to the GPU now - rooms that are out of sight included -
  * so that nothing anywhere in the museum is compiled or uploaded on the
- * frame that first shows it.
+ * frame that first shows it. Then the hall is shown, and drawn a few
+ * times while the veil is still down, and timed: `fit` is told how long
+ * a frame takes, so a resolution too high for this machine is lowered
+ * now, unseen, rather than in front of the visitor.
  */
-async function finishLoading(gl: THREE.WebGLRenderer, scene: THREE.Scene, camera: THREE.Camera) {
+async function finishLoading(
+  gl: THREE.WebGLRenderer,
+  scene: THREE.Scene,
+  camera: THREE.Camera,
+  fit: (frameMs: number) => void,
+) {
   await settled();
   await nextFrames(4);
   const meshes: THREE.Object3D[] = [];
@@ -92,7 +149,7 @@ async function finishLoading(gl: THREE.WebGLRenderer, scene: THREE.Scene, camera
     traverseVisible: (cb: (o: THREE.Object3D) => void) => meshes.forEach(cb),
   } as unknown as THREE.Object3D;
   try {
-    await gl.compileAsync(all, camera, scene);
+    await compileAsDrawn(gl, all, camera, scene);
   } catch {
     // a program that will not compile here will not compile later either; carry on
   }
@@ -110,22 +167,80 @@ async function finishLoading(gl: THREE.WebGLRenderer, scene: THREE.Scene, camera
       }
     }
   }
+  // everything drawn once, every room included, with nothing left out for being off screen
+  const culled = meshes.filter((o) => o.frustumCulled);
+  culled.forEach((o) => {
+    o.frustumCulled = false;
+  });
+  drawEverything.on = true;
+  scene.visible = true;
   await nextFrames(2);
+  drawEverything.on = false;
+  culled.forEach((o) => {
+    o.frustumCulled = true;
+  });
+  await nextFrames(3);
+  fit(await frameTime(24));
+  await nextFrames(4);
 }
 
+/** The median time between the next `n` frames, in ms. */
+const frameTime = (n: number) =>
+  new Promise<number>((resolve) => {
+    const gaps: number[] = [];
+    let last = 0;
+    const step = (t: number) => {
+      if (last) gaps.push(t - last);
+      last = t;
+      if (gaps.length < n) requestAnimationFrame(step);
+      else resolve(gaps.sort((a, b) => a - b)[Math.floor(n / 2)]);
+    };
+    requestAnimationFrame(step);
+  });
+
+/**
+ * Compile every material up front, in batches, off the main thread.
+ *
+ * Measurement settled what this is for: every frame slow enough to be
+ * felt reported `geometries +0, programs +15`. Never geometry — always
+ * shaders. A program must be compiled and linked by the graphics
+ * driver, and the synchronous `compile()` blocks until it finishes.
+ *
+ * Two things make it cheap.
+ *
+ * A program belongs to a material, not to a mesh, so the queue holds
+ * one representative mesh per material it has not seen. Eight hundred
+ * meshes share well under two hundred materials, and compiling the
+ * other six hundred would be pure repetition.
+ *
+ * And `compileAsync` uses KHR_parallel_shader_compile, so the driver
+ * links off-thread and the frame ends while it works. Each batch goes
+ * as soon as its materials exist, without waiting for the one before,
+ * so the driver is never left idle while the rooms are still going up.
+ *
+ * While the driver works, the main thread has little to do, so it uses
+ * the time to send the textures to the GPU a few at a time: that used to
+ * be three solid seconds at the very end of loading.
+ */
 function WarmShaders({
   settled,
   done,
+  fit,
   rescan,
 }: {
   settled: boolean;
   done: () => void;
+  /** Told how long a frame of the finished hall takes, before the veil lifts. */
+  fit: (frameMs: number) => void;
   /** Changes whenever rooms are built or pulled down: look for new materials again. */
   rescan: string;
 }) {
   const seen = useRef<WeakSet<THREE.Material>>(new WeakSet());
   const queue = useRef<THREE.Mesh[]>([]);
-  const busy = useRef(false);
+  const textures = useRef<THREE.Texture[]>([]);
+  const held = useRef(false);
+  /** Batches handed to the driver and not yet back. */
+  const inFlight = useRef(0);
   const quiet = useRef(0);
   const finished = useRef(false);
   /** Frames to wait before looking for newly-built rooms again. */
@@ -142,7 +257,30 @@ function WarmShaders({
     scan.current = 0;
   }, [rescan]);
 
+  /*
+    Nothing is drawn until its shaders are ready.
+
+    Drawing the hall while its programs were still queued made the first
+    frame compile every one of them itself, one after another, each
+    waiting on the driver - measured, a single frame of twenty-three
+    seconds on a laptop's integrated graphics, with the warm-up below
+    still at its second program. So the scene is held hidden (the veil
+    is over it anyway) while the programs are compiled side by side off
+    the main thread, and shown once finishLoading has them all.
+  */
+  const scene = useThree((s) => s.scene);
+  useEffect(() => {
+    const t = window.setTimeout(() => {
+      scene.visible = true;
+    }, HOLD_CAP_MS);
+    return () => window.clearTimeout(t);
+  }, [scene]);
+
   useFrame(({ gl, scene, camera }) => {
+    if (!held.current) {
+      held.current = true;
+      scene.visible = false;
+    }
     /*
       Once the queue has drained and the rooms have stopped arriving,
       this component is done and must do nothing at all.
@@ -153,48 +291,60 @@ function WarmShaders({
       nothing new. It found nothing because there was nothing left to
       find, which is exactly why it must stop looking.
     */
-    if (finished.current || busy.current) return;
+    if (finished.current) return;
 
-    if (queue.current.length === 0 && scan.current <= 0) {
+    if (scan.current <= 0) {
       /*
         Rescanned rather than collected once: the rooms arrive over
         several seconds, so anything built after the first pass would
         otherwise wait to be compiled by the frame that first drew it.
-        Every twentieth frame is often enough for that — they arrive
-        140ms apart.
+        The scene is not being drawn while this runs, so frames are
+        quick and every fourth is soon enough.
       */
-      scan.current = 20;
+      scan.current = 4;
       scene.traverse((o) => {
         const mesh = o as THREE.Mesh;
         if (!mesh.isMesh || !mesh.material) return;
         const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+        let fresh = false;
         for (const m of mats) {
           if (seen.current.has(m)) continue;
           seen.current.add(m);
+          fresh = true;
+          for (const value of Object.values(m)) {
+            if ((value as THREE.Texture | null)?.isTexture) textures.current.push(value as THREE.Texture);
+          }
+        }
+        if (fresh) {
           queue.current.push(mesh);
           compileProgress.queued(1);
-          break;
         }
       });
     }
 
     scan.current -= 1;
 
+    const start = performance.now();
+    while (textures.current.length && performance.now() - start < UPLOAD_MS) {
+      gl.initTexture(textures.current.pop()!);
+    }
+
     const batch = queue.current.splice(0, WARM_BATCH);
     if (batch.length === 0) {
-      // only announce once the rooms have finished arriving too
+      // only announce once the rooms have finished arriving and the driver has handed everything back
+      if (inFlight.current > 0) return;
       quiet.current += 1;
       if (settled && quiet.current > 45 && !finished.current) {
         finished.current = true;
-        finishLoading(gl, scene, camera).then(done, done);
+        finishLoading(gl, scene, camera, fit).then(done, done);
       }
       return;
     }
 
     quiet.current = 0;
-    busy.current = true;
+    inFlight.current += 1;
     const release = () => {
-      busy.current = false;
+      inFlight.current -= 1;
       compileProgress.compiled(batch.length);
     };
 
@@ -209,13 +359,13 @@ function WarmShaders({
       traverseVisible: (cb: (o: THREE.Object3D) => void) => batch.forEach(cb),
     } as unknown as THREE.Object3D;
 
-    gl.compileAsync(asObject, camera, scene).then(release, release);
+    compileAsDrawn(gl, asObject, camera, scene).then(release, release);
   });
 
   return null;
 }
 
-/** Past this, a furnished room is too far away to be worth drawing. *//** Past this, a furnished room is too far away to be worth drawing. */
+/** Past this, a furnished room is too far away to be worth drawing. */
 const CONTENTS_RANGE = 44;
 
 /**
@@ -233,7 +383,7 @@ function NearbyOnly({ at, children }: { at: [number, number]; children: ReactNod
   useFrame(({ camera }) => {
     const g = group.current;
     if (!g) return;
-    const near = camera.position.distanceToSquared(here) < CONTENTS_RANGE ** 2;
+    const near = drawEverything.on || camera.position.distanceToSquared(here) < CONTENTS_RANGE ** 2;
     if (g.visible !== near) g.visible = near;
   });
   return <group ref={group}>{children}</group>;
@@ -624,6 +774,17 @@ export function MuseumCanvas({
   */
   const maxDpr = useMemo(() => Math.min(1.5, window.devicePixelRatio || 1), []);
   const [dpr, setDpr] = useState(maxDpr);
+  /*
+    The first step down is taken behind the veil. Left to the monitor, it
+    came a second after the doors opened, and changing resolution means
+    rebuilding every full-screen buffer - a visible stall of a third of a
+    second or more, as the first thing a visitor on a slow laptop saw. A
+    frame slower than 25ms (under 40 a second, the monitor's own line)
+    starts at one pixel per pixel instead.
+  */
+  const fit = useCallback((frameMs: number) => {
+    if (frameMs > 25) setDpr(1);
+  }, []);
 
   return (
     <Canvas
@@ -663,6 +824,7 @@ export function MuseumCanvas({
         gl.toneMapping = THREE.ACESFilmicToneMapping;
         gl.toneMappingExposure = ATMOSPHERE.exposure;
         gl.outputColorSpace = THREE.SRGBColorSpace;
+        drawByProgram(gl);
       }}
     >
       {running ? (
@@ -713,7 +875,7 @@ export function MuseumCanvas({
           ),
         )}
 
-        <WarmShaders settled={built.length >= doors.length} done={announce} rescan={built.join(",")} />
+        <WarmShaders settled={built.length >= doors.length} done={announce} fit={fit} rescan={built.join(",")} />
 
       </Suspense>
 

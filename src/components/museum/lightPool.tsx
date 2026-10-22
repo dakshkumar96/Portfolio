@@ -28,6 +28,50 @@ import { useFrame } from "@react-three/fiber";
  */
 export const POOL_SIZE = 14;
 
+/*
+  The spotlights are lit in a loop, not one copy of the lighting code per
+  lamp.
+
+  Three writes every light loop out longhand - fourteen spotlights means
+  fourteen copies of the whole lighting model in every shader - and on
+  Windows, where the browser hands shaders to Direct3D's compiler, that
+  length is what costs: a lit material took close to a second to
+  compile, the hall has forty of them, and that was most of the loading
+  screen. As a loop the same shader compiles in well under half the
+  time, and draws the same picture. Written longhand is only needed for
+  spotlights that cast shadows or project an image, which none here do;
+  if one ever does, the original code is still there and is used.
+
+  And a lamp is only worked through for a pixel it reaches. Outside its
+  cone or past its range a spotlight adds exactly nothing, but three
+  still ran the whole lighting model for it - fourteen times a pixel,
+  when any one pixel is lit by two or three. Skipping the rest changes
+  no pixel and takes most of the work off the graphics card.
+*/
+const SPOT_LOOP_START = "#if ( NUM_SPOT_LIGHTS > 0 ) && defined( RE_Direct )";
+const SPOT_LOOP_END = "#if ( NUM_SUN_LIGHTS > 0 )";
+{
+  const chunk = THREE.ShaderChunk.lights_fragment_begin;
+  const from = chunk.indexOf(SPOT_LOOP_START);
+  const to = chunk.indexOf(SPOT_LOOP_END);
+  if (from >= 0 && to > from && !chunk.includes("SPOT_LIGHTS_AS_LOOP")) {
+    const loop = [
+      "#if ( NUM_SPOT_LIGHTS > 0 ) && defined( RE_Direct ) && ( NUM_SPOT_LIGHT_SHADOWS == 0 ) && ( NUM_SPOT_LIGHT_MAPS == 0 )",
+      "\t// SPOT_LIGHTS_AS_LOOP",
+      "\tSpotLight spotLight;",
+      "\tfor ( int i = 0; i < NUM_SPOT_LIGHTS; i ++ ) {",
+      "\t\tspotLight = spotLights[ i ];",
+      "\t\tgetSpotLightInfo( spotLight, geometryPosition, directLight );",
+      "\t\tif ( directLight.visible ) RE_Direct( directLight, geometryPosition, geometryNormal, geometryViewDir, geometryClearcoatNormal, material, reflectedLight );",
+      "\t}",
+      "#else",
+      "",
+    ].join("\n");
+    THREE.ShaderChunk.lights_fragment_begin =
+      chunk.slice(0, from) + loop + chunk.slice(from, to) + "#endif\n" + chunk.slice(to);
+  }
+}
+
 type Params = {
   intensity: number;
   color: string;

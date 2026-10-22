@@ -13,6 +13,7 @@ import { StoneMaterial, corniceProfile } from "./Vault";
 import { damaskFor, getLaylight, getMedallion, marbleFor } from "./roomTextures";
 import { getStoneGrain } from "./stoneTextures";
 import { gildedLettering } from "./inscriptions";
+import { drawEverything } from "./preload";
 
 /**
  * One room, built once, for every room.
@@ -700,7 +701,7 @@ function beamTexture() {
  * turned about its own axis to face where the camera stands, looks the
  * same from there and costs one quad each.
  */
-function Haze({ door }: { door: DoorSpec }) {
+function Haze({ door, shown }: { door: DoorSpec; shown: boolean }) {
   const tex = useMemo(() => beamTexture(), []);
   const beams = useMemo(() => {
     const eye = new THREE.Vector3(...roomView(door).position);
@@ -732,8 +733,9 @@ function Haze({ door }: { door: DoorSpec }) {
   }, [door]);
 
   if (!tex) return null;
+  /* always built, so its shader is compiled with the rest at load; only drawn while you are in the room */
   return (
-    <>
+    <group visible={shown}>
       {beams.map((b, i) => (
         <mesh key={i} position={b.mid} quaternion={b.quat} renderOrder={2}>
           <planeGeometry args={[b.width, b.len]} />
@@ -748,7 +750,7 @@ function Haze({ door }: { door: DoorSpec }) {
           />
         </mesh>
       ))}
-    </>
+    </group>
   );
 }
 
@@ -781,7 +783,7 @@ function RoomShellInner({ door, entered }: { door: DoorSpec; entered: boolean })
   useFrame(({ camera }) => {
     const g = shell.current;
     if (!g) return;
-    const show = entered || camera.position.distanceToSquared(here) < ROOM_VISIBLE_RANGE ** 2;
+    const show = drawEverything.on || entered || camera.position.distanceToSquared(here) < ROOM_VISIBLE_RANGE ** 2;
     if (g.visible !== show) g.visible = show;
   });
 
@@ -852,7 +854,7 @@ function RoomShellInner({ door, entered }: { door: DoorSpec; entered: boolean })
       <Inlay door={door} />
       {door.id === "art" ? <FloorSpill door={door} /> : null}
       <CofferedCeiling door={door} tint={SHELL.wall} />
-      {entered ? <Haze door={door} /> : null}
+      <Haze door={door} shown={entered} />
     </group>
   );
 }

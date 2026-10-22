@@ -6,6 +6,7 @@ import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import { GOLD, MID } from "./palette";
 import { isShown } from "./visibility";
+import { SAFE_FRAGMENT } from "./shaderGuard";
 
 /**
  * What stands inside each corridor case.
@@ -106,6 +107,7 @@ const holoFragment = /* glsl */ `
     float a = (rim * 0.85 + band * 0.32) * lines * uStrength;
 
     gl_FragColor = vec4(col, a);
+    ${SAFE_FRAGMENT}
   }
 `;
 
@@ -249,9 +251,21 @@ function GLBModel({
       mesh.material = mats.map((mat) => {
         const std = (mat as THREE.MeshStandardMaterial).clone() as THREE.MeshStandardMaterial;
         std.envMapIntensity = 1.35;
-        // a screen or any emissive part stays well below the statue's brightness, which is the brightest point in the hall
+        /*
+          A screen is dark glass with its picture glowing faintly in it.
+          As authored it was a white panel lit from within, and under the
+          case's own spotlight it burned out to a flat white slab that the
+          bloom spread round it - it read as a fault in the page, not a
+          laptop. Darkened, it takes the case light as a reflection the
+          way a real screen does, and stays well below the statue, the
+          brightest thing in the hall.
+        */
         if (std.emissiveMap || (std.emissive && std.emissive.getHex() > 0x111111)) {
-          std.emissiveIntensity = Math.min(std.emissiveIntensity, 0.4);
+          std.color.multiplyScalar(0.16);
+          std.roughness = Math.min(std.roughness, 0.32);
+          std.metalness = 0;
+          std.envMapIntensity = 1.1;
+          std.emissiveIntensity = Math.min(std.emissiveIntensity, 0.16);
         }
 
         if (tintBody) {

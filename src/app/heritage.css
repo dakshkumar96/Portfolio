@@ -567,34 +567,109 @@
   outline-offset: 3px;
 }
 
-/* the hint, in the shared label style: the same face, size and tracking as every other label, on SOUND OFF's baseline */
+/*
+  The hint: how to move, then what to click. It was set at the size of
+  the corner labels, which made it one more thing to squint at, and a
+  first-time visitor never found out the hall could be walked at all. So
+  it is larger and brighter than every other label, in two lines, over a
+  soft pool of shadow that keeps it legible against a lit wall.
+*/
 .museum-tip {
-  bottom: 32px;
+  bottom: 28px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  box-sizing: border-box;
+  width: max-content;
+  max-width: min(90vw, 520px);
+  margin: 0;
+  padding: 11px 20px 12px;
+  /* a dark plate, so it reads over the brightest wall and never sits on the scene itself */
+  background: rgba(12, 8, 5, 0.82);
+  box-shadow:
+    0 0 0 1px rgba(200, 148, 74, 0.2),
+    0 6px 18px rgba(0, 0, 0, 0.45);
+  font-family: var(--font-plex-mono), ui-monospace, "SFMono-Regular", Menlo, monospace;
+  line-height: 1.4;
+  text-align: center;
+  text-transform: uppercase;
+  text-wrap: balance;
+  text-shadow: none;
+  opacity: 1;
+}
+
+.museum-tip-main {
   display: flex;
   align-items: center;
   gap: 10px;
-  margin: 0;
-  font-family: var(--font-plex-mono), ui-monospace, "SFMono-Regular", Menlo, monospace;
-  font-size: 11px;
-  line-height: 1;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: #b89a72;
-  opacity: 0.75;
-  text-shadow: none;
+  font-size: 14px;
+  letter-spacing: 0.16em;
+  color: #ecdcb8;
 }
 
-.museum-tip::before {
+.museum-tip-main::before {
   content: "";
-  width: 5px;
-  height: 5px;
+  flex: none;
+  width: 6px;
+  height: 6px;
   border-radius: 50%;
   background: #5ad1d6;
-  opacity: 0.5;
+  box-shadow: 0 0 6px rgba(90, 209, 214, 0.7);
+  animation: tip-pulse 2.4s ease-in-out infinite;
+}
+
+.museum-tip-sub {
+  font-size: 12px;
+  text-wrap: balance;
+  letter-spacing: 0.1em;
+  color: #cdb78f;
+}
+
+/* a mouse is told to scroll and click; a touch screen to swipe, drag and tap */
+.tip-touch {
+  display: none;
+}
+
+@media (hover: none) and (pointer: coarse) {
+  .tip-mouse {
+    display: none;
+  }
+  .tip-touch {
+    display: inline;
+  }
+}
+
+@media (max-width: 560px) {
+  /* above the sound switch in the corner */
+  .museum-tip {
+    bottom: 62px;
+    padding: 10px 14px 11px;
+  }
+  .museum-tip-main {
+    font-size: 13px;
+    letter-spacing: 0.12em;
+  }
+  .museum-tip-sub {
+    font-size: 11.5px;
+  }
+}
+
+@keyframes tip-pulse {
+  0%,
+  100% {
+    opacity: 0.45;
+  }
+  50% {
+    opacity: 1;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .museum-placards .museum-exhibit-card.is-active {
+    animation: none;
+  }
+  .museum-tip-main::before {
     animation: none;
   }
   .museum-placards .tool-box,
@@ -668,4 +743,21 @@
   .door-plaque {
     transition: none;
   }
+}
+
+/*
+  The card the loading screen draws unseen (see MuseumWorld): above the
+  veil so the browser really paints it, too faint to see, and gone once
+  the doors open.
+*/
+.museum-card-primer {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  pointer-events: none;
+}
+
+.museum-placards.museum-card-primer .museum-exhibit-card.is-active {
+  opacity: 0.005;
+  animation: none;
 }

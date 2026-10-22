@@ -79,7 +79,7 @@ export function PerfHud() {
     };
   }, []);
 
-  useFrame(({ gl, scene }, delta) => {
+  useFrame(({ gl, scene, camera }, delta) => {
     /*
       Reached through the frame's own state rather than a captured
       value: the renderer belongs to the loop, not to render. Assigning
@@ -87,7 +87,7 @@ export function PerfHud() {
     */
     gl.info.autoReset = false;
     // debug only (this HUD mounts under ?debug): the scene, for inspecting from the console
-    (window as unknown as { __museum?: unknown }).__museum = { scene, gl };
+    (window as unknown as { __museum?: unknown }).__museum = { scene, gl, camera };
 
     const a = acc.current;
     const ms = delta * 1000;

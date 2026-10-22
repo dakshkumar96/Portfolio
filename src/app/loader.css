@@ -14,7 +14,7 @@
 
   The two typefaces are set here and nowhere else in this file, so
   changing either is one line:
-    --veil-serif   the name and the number
+    --veil-serif   the name and the words at the foot of the doors
     --veil-mono    every label
 */
 
@@ -506,10 +506,12 @@
 /* ------------------------------------------------------------------ */
 
 /*
-  Light leaking through the join. The wrapper only draws in, outward from
-  the middle; the two pieces inside are driven by the real progress. The
-  gap is 1px at the start and widens to 6px, brightest at its core, and the
-  glow around it comes up with it.
+  The loading bar is the join between the doors. Before anything has
+  loaded it is a dark hairline; as the hall really loads, light climbs it
+  from the floor, with a bright point at its head, until it reaches the
+  top of the doors - and then the doors open. The wrapper only draws in,
+  outward from the middle; the light, its glow and its head are driven by
+  the real progress (LoadingVeil), from the floor up.
 */
 .veil-seam {
   position: absolute;
@@ -520,25 +522,57 @@
   animation: veil-draw 0.4s cubic-bezier(0.2, 0.7, 0.2, 1) both;
 }
 
+/* the crack before the light reaches it */
+.veil-seam::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: calc(50% - 0.5px);
+  width: 1px;
+  background: rgba(224, 176, 112, 0.2);
+}
+
 .veil-gap,
 .veil-glow {
   position: absolute;
   inset: 0;
+  transform: scaleY(0);
+  transform-origin: 50% 100%;
 }
 
 .veil-gap {
   background: linear-gradient(
     90deg,
-    rgba(224, 176, 112, 0.15),
-    #e0b070 50%,
-    rgba(224, 176, 112, 0.15)
+    rgba(224, 176, 112, 0),
+    rgba(224, 176, 112, 0.4) 30%,
+    #f2cc94 50%,
+    rgba(224, 176, 112, 0.4) 70%,
+    rgba(224, 176, 112, 0)
   );
-  transform: scaleX(0.1667);
 }
 
 .veil-glow {
-  box-shadow: 0 0 40px 6px rgba(200, 148, 74, 0.35);
-  opacity: 0.25;
+  box-shadow: 0 0 36px 5px rgba(200, 148, 74, 0.4);
+  opacity: 0.5;
+}
+
+/* where the climbing light has got to: a small bright bloom on the line */
+.veil-head {
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  width: 26px;
+  height: 26px;
+  margin: 0 0 -13px -13px;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle,
+    rgba(255, 238, 206, 0.95) 0,
+    rgba(242, 196, 128, 0.5) 28%,
+    rgba(200, 148, 74, 0) 70%
+  );
+  pointer-events: none;
 }
 
 @keyframes veil-draw {
@@ -551,41 +585,44 @@
 }
 
 /* ------------------------------------------------------------------ */
-/* The number                                                          */
+/* The plate at the foot of the doors                                  */
 /* ------------------------------------------------------------------ */
 
-/* big, quiet and low in the corner: a figure to glance at, not a label to read */
+/*
+  A small plate fixed across the join near the floor, the light rising
+  from behind it, saying what is being done: carrying in the exhibits,
+  hanging the pictures, lighting the hall, opening the doors. The words
+  are cut into it - a dark edge over them, a catch of light under - and
+  change with a short fade when the work moves on.
+*/
 .veil-status {
   position: absolute;
-  left: 32px;
-  bottom: 28px;
-  display: flex;
-  align-items: baseline;
-  gap: 16px;
+  left: 50%;
+  bottom: 34px;
   margin: 0;
+  padding: 10px 20px 11px;
+  transform: translateX(-50%);
+  background: var(--panel);
+  box-shadow:
+    0 0 0 1px rgba(200, 148, 74, 0.22),
+    inset 0 1px 0 rgba(255, 220, 160, 0.06);
   white-space: nowrap;
   animation: veil-fade 0.8s ease 1.2s both;
 }
 
-.veil-num {
-  min-width: 2.4ch;
+.veil-words {
+  display: block;
   font-family: var(--veil-serif);
-  font-size: 64px;
-  font-weight: 300;
+  font-size: 19px;
+  font-style: italic;
+  font-weight: 500;
   line-height: 1;
-  font-variant-numeric: lining-nums tabular-nums;
-  text-align: left;
-  color: rgba(184, 154, 114, 0.55);
-}
-
-.veil-caption {
-  font-family: var(--veil-mono);
-  font-size: 11px;
-  font-weight: 400;
-  line-height: 1;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--text-muted);
+  letter-spacing: 0.03em;
+  color: var(--gold-hi);
+  text-shadow:
+    0 -1px 0 rgba(0, 0, 0, 0.65),
+    0 1px 0 rgba(255, 214, 150, 0.14);
+  transition: opacity 0.24s ease;
 }
 
 @keyframes veil-fade {
@@ -603,8 +640,8 @@
 
 /*
   The light flares and the indicators brighten, and then the leaves part
-  and carry their text with them. The number and the plaque are not theirs
-  to carry, so they go first, quickly. Behind the leaves the hall's light
+  and carry their text with them. The two plates are not theirs to carry,
+  so they go first, quickly. Behind the leaves the hall's light
   comes up over the same 1.4s on the same curve (the rule at the foot of
   this section), so it is revealed rather than uncovered. The 0.3s head
   start is the flare.
@@ -712,16 +749,13 @@
   .veil-panel-right .veil-hud {
     right: 20px;
   }
-  /* the sound link takes the other corner, so the number stacks over its caption */
+  /* clear of the sound link in the corner below */
   .veil-status {
-    left: 20px;
-    bottom: 24px;
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 10px;
+    bottom: 72px;
+    padding: 9px 16px 10px;
   }
-  .veil-num {
-    font-size: 48px;
+  .veil-words {
+    font-size: 17px;
   }
 }
 

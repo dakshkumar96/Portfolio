@@ -36,3 +36,19 @@ export function settled(limitMs = 20000): Promise<void> {
     check();
   });
 }
+
+/**
+ * Set for a couple of frames at the very end of loading, behind the
+ * veil: every room and everything in it is drawn once, wherever the
+ * camera is. The graphics driver finishes preparing a shader only when
+ * something is first drawn with it, and that cost - about a fifth of a
+ * second a shader on a laptop - used to land on the step through a
+ * room's door. Whatever hides itself by distance shows itself while
+ * this is on.
+ */
+export const drawEverything = { on: false };
+
+/** How many registered jobs are still running: the loading screen says so while the pictures are being prepared. */
+export function pendingJobs() {
+  return pending.size;
+}

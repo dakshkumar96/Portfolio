@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useFrame } from "@react-three/fiber";
-import { RoundedBox } from "@react-three/drei";
+import { RoundedBox } from "./roundedBox";
 import * as THREE from "three";
 import { consumedDrag } from "./lookControls";
 import { GOLD } from "./theme";

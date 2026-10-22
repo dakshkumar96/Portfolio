@@ -8,6 +8,7 @@ import { useEffect, useRef, useState } from "react";
 import { useProgress } from "@react-three/drei/core/Progress";
 import { site } from "@/content/site";
 import { compileProgress } from "./loadProgress";
+import { pendingJobs } from "./preload";
 
 /**
  * The loading screen: the first door.
@@ -17,9 +18,10 @@ import { compileProgress } from "./loadProgress";
  * right, and warm light is leaking through. Heritage is the architecture,
  * not decoration: a recessed panel in each leaf, a band of ajrak lattice
  * along the outer edge, a pointed arch across both, brass pulls with a
- * single cyan indicator. All of it is faint, so the name stays the hero. As the hall really loads the
- * crack widens and the light grows; when it is full the light flares, the
- * panels part, and the hall's light comes up behind them.
+ * single cyan indicator. All of it is faint, so the name stays the hero. As the hall really loads,
+ * light climbs the crack from the floor to the top of the doors, and a
+ * plate at their foot says what is being done; when the light reaches the
+ * top it flares, the panels part, and the hall's light comes up behind them.
  *
  * Plain DOM, in the first HTML. It must be on screen before anything else
  * is, and stay on screen while the main thread is at its busiest.
@@ -32,10 +34,11 @@ import { compileProgress } from "./loadProgress";
  *    nearly all of the second half, and the part `useProgress` cannot see
  *  - then "ready": the hall is drawn, and the door opens
  *
- * Nothing here is a timer pretending. The crack only widens when something
- * has actually finished, and never closes again.
+ * Nothing here is a timer pretending. The light only climbs when something
+ * has actually finished, and never falls back. The plate's words come from
+ * the same signals: what it says is still loading is what is still loading.
  *
- * The crack and the number are written straight to the DOM on animation
+ * The light and the words are written straight to the DOM on animation
  * frames rather than through React state, so that showing progress never
  * costs a render on the busiest thread in the page.
  */
@@ -51,8 +54,20 @@ const COMPILE = 0.49;
 */
 const MIN_SHOWN_MS = 2600;
 
-/** The crack is this wide when full (px); it starts at 1px. */
-const GAP_FULL = 6;
+/*
+  What the plate at the foot of the doors says, in the order the work is
+  done. Each is held for at least STAGE_MS, so a stage that is over in a
+  moment does not flicker past unread.
+*/
+const STAGES = {
+  assets: "Carrying in the exhibits",
+  pictures: "Hanging the pictures",
+  shaders: "Lighting the hall",
+  ready: "Opening the doors",
+} as const;
+const STAGE_MS = 1100;
+/** How long the words take to fade out before the next ones fade in (the stylesheet's transition). */
+const STAGE_FADE_MS = 240;
 
 /** The line under the name, on a plaque across the crack. */
 const ROLE = "AI ENGINEER";
@@ -144,7 +159,8 @@ export function LoadingVeil({
 
   const gap = useRef<HTMLElement>(null);
   const glow = useRef<HTMLElement>(null);
-  const counter = useRef<HTMLSpanElement>(null);
+  const head = useRef<HTMLElement>(null);
+  const words = useRef<HTMLSpanElement>(null);
   const root = useRef<HTMLDivElement>(null);
   /* what the frame loop reads: the latest of each signal, without re-running it */
   const signals = useRef({ ready: false, assets: 0 });
@@ -159,8 +175,9 @@ export function LoadingVeil({
   useEffect(() => {
     const crack = gap.current;
     const light = glow.current;
-    const label = counter.current;
-    if (!crack || !light || !label) return;
+    const tip = head.current;
+    const label = words.current;
+    if (!crack || !light || !tip || !label) return;
 
     let shown = 0;
     let shownPercent = -1;
@@ -169,20 +186,49 @@ export function LoadingVeil({
     let previous = performance.now();
     const mounted = previous;
 
+    /* the words on the plate: what they say now, when they last changed, and whether they are fading out */
+    let saying: string = STAGES.assets;
+    let changedAt = mounted;
+    let fadingSince = 0;
+    label.textContent = saying;
+
     const paint = () => {
       const percent = Math.round(shown * 100);
       if (percent !== shownPercent) {
         shownPercent = percent;
-        label.textContent = String(percent);
-        // the name catches more of the seam's light as the crack widens
+        // the name catches more of the seam's light as it climbs
         root.current?.style.setProperty("--seam", (percent / 100).toFixed(2));
       }
       const step = Math.round(shown * 1000);
       if (step !== shownStep) {
         shownStep = step;
-        /* 1px at the start, GAP_FULL px at the end; the glow comes up with it */
-        crack.style.transform = `scaleX(${(1 + (GAP_FULL - 1) * shown) / GAP_FULL})`;
-        light.style.opacity = String(0.25 + 0.75 * shown);
+        /* the light climbs from the floor; its glow and its bright tip go with it */
+        crack.style.transform = `scaleY(${shown})`;
+        light.style.transform = `scaleY(${shown})`;
+        light.style.opacity = String(0.5 + 0.5 * shown);
+        tip.style.bottom = `${(shown * 100).toFixed(2)}%`;
+      }
+    };
+
+    const say = (now: number, done: boolean, assets: number) => {
+      const wanted = done
+        ? STAGES.ready
+        : assets < 1
+          ? STAGES.assets
+          : pendingJobs() > 0
+            ? STAGES.pictures
+            : STAGES.shaders;
+      if (fadingSince) {
+        if (now - fadingSince >= STAGE_FADE_MS) {
+          saying = wanted;
+          label.textContent = wanted;
+          label.style.opacity = "1";
+          fadingSince = 0;
+          changedAt = now;
+        }
+      } else if (wanted !== saying && now - changedAt >= STAGE_MS) {
+        label.style.opacity = "0";
+        fadingSince = now;
       }
     };
 
@@ -199,6 +245,7 @@ export function LoadingVeil({
       if (goal > shown) shown += (goal - shown) * (1 - Math.exp(-(done ? 8 : 2.6) * dt));
 
       paint();
+      say(now, done, assets);
       if (done && shown > 0.995 && now - mounted >= MIN_SHOWN_MS) {
         shown = 1;
         paint();
@@ -228,13 +275,20 @@ export function LoadingVeil({
     if (phase !== "exit") return;
     /*
       However the door came to open - the frame loop reaching the end, or
-      the timer above because frames were not coming - the crack and the
-      number read full as it goes.
+      the timer above because frames were not coming - the light reaches
+      the top as it goes.
     */
     closing.current = true;
-    if (counter.current) counter.current.textContent = "100";
-    if (gap.current) gap.current.style.transform = "scaleX(1)";
-    if (glow.current) glow.current.style.opacity = "1";
+    if (words.current) {
+      words.current.textContent = STAGES.ready;
+      words.current.style.opacity = "1";
+    }
+    if (gap.current) gap.current.style.transform = "none";
+    if (head.current) head.current.style.bottom = "100%";
+    if (glow.current) {
+      glow.current.style.transform = "none";
+      glow.current.style.opacity = "1";
+    }
     root.current?.style.setProperty("--seam", "1");
     onOpen?.();
     /* the flare, then the 1.4s slide */
@@ -286,20 +340,19 @@ export function LoadingVeil({
         </div>
       </div>
 
-      {/* the crack the light comes through: one element draws in, two are driven by the real progress */}
+      {/* the crack the light climbs: the wrapper draws in; the light, its glow and its tip follow the real progress */}
       <div className="veil-seam">
         <i ref={glow} className="veil-glow" />
         <i ref={gap} className="veil-gap" />
+        <i ref={head} className="veil-head" />
       </div>
 
       {/* a lintel plaque across the crack: the plate hides the seam behind it, so the line reads whole */}
       <p className="veil-plate">{ROLE}</p>
 
+      {/* a second plate, at the foot of the doors: what is being done */}
       <p className="veil-status">
-        <span ref={counter} className="veil-num">
-          0
-        </span>
-        <span className="veil-caption">Entering the gallery</span>
+        <span ref={words} className="veil-words" />
       </p>
     </div>
   );

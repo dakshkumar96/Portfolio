@@ -35,6 +35,9 @@ const STAGES = [
   { id: "hall-5", vh: 240 },
 ];
 
+/** The card the loading screen draws unseen: one with every part a card can have, if there is one. */
+const primerExhibit = allExhibits.find((e) => e.bullets?.length && e.meta) ?? allExhibits[0];
+
 /** Catalogue numbers, the way a collection numbers its holdings. */
 function toRoman(n: number) {
   const table: [number, string][] = [
@@ -50,6 +53,112 @@ function toRoman(n: number) {
     }
   }
   return out;
+}
+
+/** What is printed on a catalogue card: everything inside the <article>. */
+function CardContents({ exhibit, index, onClose }: { exhibit: ExhibitDatum; index: number; onClose?: () => void }) {
+  return (
+    <>
+      {/*
+        A page from a catalogue, made by someone.
+
+        The number is a rubber stamp pressed in the corner and the
+        divider is a flourish a nib would leave. The first letter
+        of the text is illuminated. At the foot there is a
+        signature in a margin hand and a seal in wax. Each of
+        those is a mark of a person having done it, which is the
+        one thing an interface card never has.
+      */}
+      <CatalogueStamp numeral={toRoman(index + 1)} />
+      <h2>{exhibit.title}</h2>
+      {exhibit.meta ? <p className="museum-placard-meta">{exhibit.meta}</p> : null}
+      <div className="cat-rule" aria-hidden="true" />
+      {exhibit.body ? (
+        <p className={`museum-placard-copy${exhibit.body.length < 90 ? " is-short" : ""}`}>
+          {exhibit.body}
+        </p>
+      ) : null}
+      {exhibit.tools?.length ? (
+        <ul className="tool-grid">
+          {exhibit.tools.map((tool) => (
+            <ToolBox key={tool} name={tool} />
+          ))}
+        </ul>
+      ) : null}
+      {exhibit.bullets?.length ? (
+        <ol className="museum-placard-list">
+          {exhibit.bullets.map((item) => (
+            <li key={item}>{item}</li>
+          ))}
+        </ol>
+      ) : null}
+      {exhibit.links?.length ? (
+        <div className="museum-contact-links">
+          {exhibit.links.map((link) =>
+            link.external ? (
+              <a key={link.href} href={link.href} target="_blank" rel="noreferrer">
+                {link.label}
+              </a>
+            ) : (
+              <Link key={link.href} href={link.href}>
+                {link.label}
+              </Link>
+            ),
+          )}
+        </div>
+      ) : null}
+      {/* only links that go somewhere: a project with no live site and no public code shows none */}
+      {exhibit.actions?.some((action) => action.href) ? (
+        <div className="cat-actions">
+          {/* a note in the margin, with an arrow drawn by hand */}
+          <span className="cat-note" aria-hidden="true">
+            have a look
+            <svg viewBox="0 0 44 30" focusable="false">
+              <path
+                d="M3 4 C 12 2, 24 6, 30 18 M 22 17 L 31 20 L 33 10"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.7"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          </span>
+          {exhibit.actions
+            .filter((action) => action.href)
+            .map((action) => (
+              <a
+                key={action.label}
+                className="cat-action"
+                href={action.href}
+                target="_blank"
+                rel="noreferrer"
+              >
+                {action.label}
+                <svg viewBox="0 0 12 12" aria-hidden="true" focusable="false">
+                  <path
+                    d="M3 9L9 3M4.5 3H9v4.5"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.3"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              </a>
+            ))}
+        </div>
+      ) : null}
+      <div className="cat-end">
+        <WaxSeal className="cat-seal" />
+        {onClose ? (
+          <button type="button" className="museum-close" onClick={onClose}>
+            Return
+          </button>
+        ) : null}
+      </div>
+    </>
+  );
 }
 
 export function MuseumWorld() {
@@ -189,11 +298,13 @@ export function MuseumWorld() {
   /*
     A cap on the whole thing. Whatever goes wrong — a driver that never
     reports a compile finished, a machine slow enough that the queue
-    never drains — nobody is left behind a loading screen forever.
+    never drains — nobody is left behind a loading screen forever. It
+    sits just past the canvas's own cap on holding the hall back
+    (HOLD_CAP_MS in MuseumCanvas), so the hall is always there to see.
   */
   useEffect(() => {
     if (painted || webgl === false) return;
-    const bail = window.setTimeout(() => setPainted(true), 12000);
+    const bail = window.setTimeout(() => setPainted(true), 28000);
     return () => window.clearTimeout(bail);
   }, [painted, webgl]);
 
@@ -244,6 +355,25 @@ export function MuseumWorld() {
         onOpen={handleOpen}
       />
 
+      {/*
+        One card, drawn while the museum loads and never seen.
+
+        The first card anyone opened stalled the page for most of a second:
+        the browser had never drawn one, so it had to decode the vine
+        corners and the paper's grain and fibre, set the type, and prepare
+        the blur and the shadows, all on that click. Drawn once here first -
+        above the loading screen, so it is really drawn, at half a percent
+        opacity, so it is not seen - all of that is ready before the doors
+        open, and it is taken away as they do.
+      */}
+      {loaded && !lit ? (
+        <div className="museum-placards museum-card-primer" aria-hidden="true" inert>
+          <article className="museum-exhibit-card is-active">
+            <CardContents exhibit={primerExhibit} index={0} />
+          </article>
+        </div>
+      ) : null}
+
       <div ref={rootRef} className={`museum-root${ready ? " ready" : ""}`}>
         <HeritageDefs />
 
@@ -263,7 +393,7 @@ export function MuseumWorld() {
 
         {webgl === false ? (
           <div className="museum-nowebgl">
-            <p>This browser can&rsquo;t run the 3D museum (WebGL is unavailable).</p>
+            <p>This browser can&rsquo;t run the 3D museum because WebGL isn&rsquo;t available.</p>
             <Link href="/profile">View the full portfolio instead →</Link>
           </div>
         ) : null}
@@ -297,9 +427,26 @@ export function MuseumWorld() {
             </button>
           </div>
         ) : null}
-        {/* every case, frame, board and logo opens a card, not only the doors: say so */}
+        {/*
+          How to get about, in two lines: moving first, since nothing on
+          screen says the hall can be walked, then what can be clicked -
+          every case, frame, board and logo opens a card, not only the
+          doors. A phone has no wheel and a room has no swipe to walk, so
+          a touch screen is told what it can actually do there.
+        */}
         <p className={`museum-tip${active ? " hidden" : ""}`}>
-          {room ? "Click anything to read about it" : "Click a door to enter a room, or anything else to read about it"}
+          <span className="museum-tip-main">
+            <span className="tip-mouse">{room ? "Scroll to walk through the room" : "Scroll to walk down the hall"}</span>
+            <span className="tip-touch">{room ? "Drag to look around the room" : "Swipe up to walk down the hall"}</span>
+          </span>
+          <span className="museum-tip-sub">
+            <span className="tip-mouse">
+              {room ? "Click anything to read about it" : "Click a door to go in, or anything else to read about it"}
+            </span>
+            <span className="tip-touch">
+              {room ? "Tap anything to read about it" : "Tap a door to go in, or anything else to read about it"}
+            </span>
+          </span>
         </p>
 
         {/*
@@ -315,104 +462,7 @@ export function MuseumWorld() {
                 className={`museum-exhibit-card${isActive ? " is-active" : ""}`}
                 aria-hidden={isActive ? undefined : "true"}
               >
-                {/*
-                  A page from a catalogue, made by someone.
-
-                  The number is a rubber stamp pressed in the corner and the
-                  divider is a flourish a nib would leave. The first letter
-                  of the text is illuminated. At the foot there is a
-                  signature in a margin hand and a seal in wax. Each of
-                  those is a mark of a person having done it, which is the
-                  one thing an interface card never has.
-                */}
-                <CatalogueStamp numeral={toRoman(i + 1)} />
-                <h2>{exhibit.title}</h2>
-                {exhibit.meta ? <p className="museum-placard-meta">{exhibit.meta}</p> : null}
-                <div className="cat-rule" aria-hidden="true" />
-                {exhibit.body ? (
-                  <p className={`museum-placard-copy${exhibit.body.length < 90 ? " is-short" : ""}`}>
-                    {exhibit.body}
-                  </p>
-                ) : null}
-                {exhibit.tools?.length ? (
-                  <ul className="tool-grid">
-                    {exhibit.tools.map((tool) => (
-                      <ToolBox key={tool} name={tool} />
-                    ))}
-                  </ul>
-                ) : null}
-                {exhibit.bullets?.length ? (
-                  <ol className="museum-placard-list">
-                    {exhibit.bullets.map((item) => (
-                      <li key={item}>{item}</li>
-                    ))}
-                  </ol>
-                ) : null}
-                {exhibit.links?.length ? (
-                  <div className="museum-contact-links">
-                    {exhibit.links.map((link) =>
-                      link.external ? (
-                        <a key={link.href} href={link.href} target="_blank" rel="noreferrer">
-                          {link.label}
-                        </a>
-                      ) : (
-                        <Link key={link.href} href={link.href}>
-                          {link.label}
-                        </Link>
-                      ),
-                    )}
-                  </div>
-                ) : null}
-                {/* only links that go somewhere: a project with no live site and no public code shows none */}
-                {exhibit.actions?.some((action) => action.href) ? (
-                  <div className="cat-actions">
-                    {/* a note in the margin, with an arrow drawn by hand */}
-                    <span className="cat-note" aria-hidden="true">
-                      have a look
-                      <svg viewBox="0 0 44 30" focusable="false">
-                        <path
-                          d="M3 4 C 12 2, 24 6, 30 18 M 22 17 L 31 20 L 33 10"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="1.7"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                        />
-                      </svg>
-                    </span>
-                    {exhibit.actions
-                      .filter((action) => action.href)
-                      .map((action) => (
-                        <a
-                          key={action.label}
-                          className="cat-action"
-                          href={action.href}
-                          target="_blank"
-                          rel="noreferrer"
-                        >
-                          {action.label}
-                          <svg viewBox="0 0 12 12" aria-hidden="true" focusable="false">
-                            <path
-                              d="M3 9L9 3M4.5 3H9v4.5"
-                              fill="none"
-                              stroke="currentColor"
-                              strokeWidth="1.3"
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                            />
-                          </svg>
-                        </a>
-                      ))}
-                  </div>
-                ) : null}
-                <div className="cat-end">
-                  <WaxSeal className="cat-seal" />
-                  {isActive ? (
-                    <button type="button" className="museum-close" onClick={() => setActive(null)}>
-                      Return
-                    </button>
-                  ) : null}
-                </div>
+                <CardContents exhibit={exhibit} index={i} onClose={isActive ? () => setActive(null) : undefined} />
               </article>
             );
           })}
