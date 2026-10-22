@@ -7,6 +7,7 @@ import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { MID } from "./palette";
 import { buildFigure } from "./figure";
 import { gildedLettering } from "./inscriptions";
+import { brushedMetalFor } from "./textures";
 import { useThree } from "@react-three/fiber";
 import { track } from "./preload";
 import { bakeStatueShadow, receiveStatueShadow, shadowOnTop } from "./statueShadow";
@@ -328,59 +329,85 @@ const PLAQUE_H = 0.4;
 const PLAQUE_Y = 0.18 + (PLINTH_H - 0.5) / 2;
 /** The die's front face. */
 const FACE_Z = 0.85;
+/** How far the cast plate stands proud of the stone. */
+const PLATE_D = 0.018;
 
 /**
- * His name on the plinth: gilded capitals on a dark bronze plaque sunk into
- * the stone.
+ * His name on the plinth: a cast bronze plaque screwed to the stone.
  *
- * It used to be cut straight into the pale stone at a third of this size,
- * gold on beige, and from anywhere a visitor stands it could not be read.
- * On a dark ground, larger, and lit a little from within, it reads from
- * down the hall, the way a museum labels its one great piece. The plaque
- * is set in, not laid on: the top and left edges of the recess are in
- * shadow and the bottom and right catch a thin line of gold, as a sunk
- * panel does under light from above and to the left.
+ * A dark, brushed plate with a raised border, the letters standing up out
+ * of it in polished bronze, and a screw at each corner. The letters are
+ * lit by the room, not by themselves: each one carries a fine shadow below
+ * and to the right, cast on the plate, which is what makes raised lettering
+ * read as raised. They keep only a trace of glow, enough to be read from
+ * down the hall in a dim alcove.
  */
 function Name() {
   const tex = useMemo(() => gildedLettering("DAKSH KUMAR", { width: 1024, height: 256, cap: 112, tracking: 0.3 }), []);
   useEffect(() => () => tex.dispose(), [tex]);
-  const edge = 0.016;
-  const shadow = <meshStandardMaterial color="#0d0905" roughness={0.9} metalness={0} envMapIntensity={0.2} />;
-  const lit = <meshStandardMaterial color={MID.bronze} roughness={0.3} metalness={0.9} envMapIntensity={1.3} emissive="#7a5418" emissiveIntensity={0.3} />;
+  const brushed = useMemo(() => brushedMetalFor(2.5, 0.7), []);
+  const front = PLATE_D / 2;
+  const border = 0.024;
+  const inset = 0.03;
+  const trim = (
+    <meshStandardMaterial color={MID.bronze} roughness={0.3} metalness={0.95} envMapIntensity={1.2} />
+  );
   return (
-    <group position={[0, PLAQUE_Y, FACE_Z]}>
-      <mesh position={[0, 0, 0.003]}>
-        <boxGeometry args={[PLAQUE_W, PLAQUE_H, 0.006]} />
-        <meshStandardMaterial color="#2e2116" roughness={0.55} metalness={0.45} envMapIntensity={0.7} />
+    <group position={[0, PLAQUE_Y, FACE_Z + front]}>
+      {/* the plate: patinated bronze, brushed along its length, its edges eased */}
+      <RoundedBox args={[PLAQUE_W, PLAQUE_H, PLATE_D]} radius={0.006} smoothness={2}>
+        <meshStandardMaterial
+          color="#5a4330"
+          map={brushed?.map ?? null}
+          roughnessMap={brushed?.roughnessMap ?? null}
+          normalMap={brushed?.normalMap ?? null}
+          normalScale={new THREE.Vector2(0.35, 0.35)}
+          roughness={0.55}
+          metalness={0.85}
+          envMapIntensity={0.9}
+        />
+      </RoundedBox>
+      {/* the raised border, cast with the plate */}
+      {[
+        [0, PLAQUE_H / 2 - inset, PLAQUE_W - inset * 2 + border, border],
+        [0, -PLAQUE_H / 2 + inset, PLAQUE_W - inset * 2 + border, border],
+        [-PLAQUE_W / 2 + inset, 0, border, PLAQUE_H - inset * 2 + border],
+        [PLAQUE_W / 2 - inset, 0, border, PLAQUE_H - inset * 2 + border],
+      ].map(([x, y, w, h], i) => (
+        <RoundedBox key={i} args={[w, h, 0.008]} radius={0.003} smoothness={2} position={[x, y, front + 0.003]}>
+          {trim}
+        </RoundedBox>
+      ))}
+      {/* a screw in each corner */}
+      {[-1, 1].flatMap((sx) =>
+        [-1, 1].map((sy) => (
+          <mesh
+            key={`${sx}${sy}`}
+            position={[sx * (PLAQUE_W / 2 - inset / 2 + 0.002), sy * (PLAQUE_H / 2 - inset / 2 + 0.002), front]}
+            scale={[1, 1, 0.45]}
+          >
+            <sphereGeometry args={[0.0085, 12, 8]} />
+            {trim}
+          </mesh>
+        )),
+      )}
+      {/* the letters' shadow on the plate, just below and to the right */}
+      <mesh position={[0.004, -0.005, front + 0.001]}>
+        <planeGeometry args={[PLAQUE_W * 0.86, PLAQUE_H * 0.86]} />
+        <meshBasicMaterial color="#000000" alphaMap={tex} transparent opacity={0.55} depthWrite={false} />
       </mesh>
-      {/* the recess's edges: shadow along the top and left, a fine gold rim along the bottom and right */}
-      <mesh position={[0, PLAQUE_H / 2 - edge / 2, 0.0075]}>
-        <planeGeometry args={[PLAQUE_W, edge]} />
-        {shadow}
-      </mesh>
-      <mesh position={[-PLAQUE_W / 2 + edge / 2, 0, 0.0075]}>
-        <planeGeometry args={[edge, PLAQUE_H]} />
-        {shadow}
-      </mesh>
-      <mesh position={[0, -PLAQUE_H / 2 + 0.004, 0.0076]}>
-        <planeGeometry args={[PLAQUE_W, 0.008]} />
-        {lit}
-      </mesh>
-      <mesh position={[PLAQUE_W / 2 - 0.004, 0, 0.0076]}>
-        <planeGeometry args={[0.008, PLAQUE_H]} />
-        {lit}
-      </mesh>
-      <mesh position={[0, 0, 0.0078]}>
-        <planeGeometry args={[PLAQUE_W * 0.94, PLAQUE_H * 0.94]} />
+      {/* the letters, standing up out of the plate */}
+      <mesh position={[0, 0, front + 0.004]}>
+        <planeGeometry args={[PLAQUE_W * 0.86, PLAQUE_H * 0.86]} />
         <meshStandardMaterial
           map={tex}
           alphaTest={0.35}
-          roughness={0.32}
-          metalness={0.8}
-          envMapIntensity={1.4}
+          roughness={0.26}
+          metalness={0.9}
+          envMapIntensity={1.5}
           emissive="#c8944a"
           emissiveMap={tex}
-          emissiveIntensity={0.85}
+          emissiveIntensity={0.28}
         />
       </mesh>
     </group>
@@ -388,51 +415,91 @@ function Name() {
 }
 
 /*
-  The plinth's stone, which takes the statue's shadow. Its upper faces
-  carry the faintest dust, a little paler and less glossy where nothing
-  has wiped it, found from which way the surface faces.
+  The plinth's stone: a honed limestone, warm cream, made in the shader
+  from where each point is in the world, the way the statue's marble is,
+  so every face has its own veins and grain with no tile or seam and no
+  two faces alike.
+
+    - colour that clouds slowly across a block, as quarried stone does
+    - two families of veins, a few soft wide ones and finer thin ones,
+      wandering rather than straight
+    - a fine grain of lighter and darker specks, and the same grain as
+      relief, so the surface catches the light instead of looking printed
+    - on the cap, the faintest dust on its upper face, paler and less
+      glossy where nothing has wiped it
 */
-const DUST_HEAD = /* glsl */ `
-varying vec3 vDustWorld;
-float dHash( vec3 p ) { p = fract( p * 0.3183099 + 0.1 ); p *= 17.0; return fract( p.x * p.y * p.z * ( p.x + p.y + p.z ) ); }
+const STONE_HEAD = /* glsl */ `
+varying vec3 vStoneWorld;
+float sHash( vec3 p ) { p = fract( p * 0.3183099 + 0.1 ); p *= 17.0; return fract( p.x * p.y * p.z * ( p.x + p.y + p.z ) ); }
+float sNoise( vec3 x ) {
+	vec3 i = floor( x ); vec3 f = fract( x ); f = f * f * ( 3.0 - 2.0 * f );
+	return mix( mix( mix( sHash( i ), sHash( i + vec3( 1, 0, 0 ) ), f.x ), mix( sHash( i + vec3( 0, 1, 0 ) ), sHash( i + vec3( 1, 1, 0 ) ), f.x ), f.y ),
+		mix( mix( sHash( i + vec3( 0, 0, 1 ) ), sHash( i + vec3( 1, 0, 1 ) ), f.x ), mix( sHash( i + vec3( 0, 1, 1 ) ), sHash( i + vec3( 1, 1, 1 ) ), f.x ), f.y ), f.z );
+}
+float sFbm( vec3 p ) { return 0.5 * sNoise( p ) + 0.25 * sNoise( p * 2.03 ) + 0.125 * sNoise( p * 4.01 ) + 0.0625 * sNoise( p * 8.03 ); }
 `;
 
-function dusty(material: THREE.MeshStandardMaterial, amount: number) {
-  if (material.userData.dust) return;
-  material.userData.dust = true;
+const CAP_DUST = /* glsl */ `
+	vec3 capFacing = normalize( cross( dFdx( vStoneWorld ), dFdy( vStoneWorld ) ) );
+	float dust = smoothstep( 0.85, 0.98, abs( capFacing.y ) ) * ( 0.6 + 0.4 * sHash( floor( vStoneWorld * 160.0 ) ) ) * 0.05;
+	diffuseColor.rgb = mix( diffuseColor.rgb, vec3( 0.72, 0.68, 0.6 ), dust );
+	roughnessFactor = mix( roughnessFactor, 0.9, dust * 6.0 );`;
+
+function stone(material: THREE.MeshStandardMaterial, cap: boolean) {
+  if (material.userData.stone) return;
+  material.userData.stone = true;
   material.onBeforeCompile = (shader) => {
     shader.vertexShader = shader.vertexShader
-      .replace("void main() {", `varying vec3 vDustWorld;
+      .replace("void main() {", `varying vec3 vStoneWorld;
 void main() {`)
       .replace("#include <project_vertex>", `#include <project_vertex>
-	vDustWorld = ( modelMatrix * vec4( transformed, 1.0 ) ).xyz;`);
+	vStoneWorld = ( modelMatrix * vec4( transformed, 1.0 ) ).xyz;`);
     shader.fragmentShader = shader.fragmentShader
-      .replace("void main() {", `${DUST_HEAD}
+      .replace("void main() {", `${STONE_HEAD}
 void main() {`)
+      .replace(
+        "#include <color_fragment>",
+        `#include <color_fragment>
+	vec3 sp = vStoneWorld;
+	float cloud = sFbm( sp * 1.4 );
+	float warp = sFbm( sp * 0.8 + 11.0 );
+	float wide = 1.0 - smoothstep( 0.0, 0.16, abs( sin( ( sp.x * 0.9 + sp.y * 1.6 - sp.z * 0.5 + warp * 4.2 ) * 2.4 ) ) );
+	float thin = 1.0 - smoothstep( 0.0, 0.07, abs( sin( ( - sp.x * 0.6 + sp.y * 2.1 + sp.z * 1.1 + warp * 3.1 ) * 4.3 ) ) );
+	thin *= smoothstep( 0.35, 0.65, sNoise( sp * 2.2 + 3.0 ) );
+	float speck = sHash( floor( sp * 260.0 ) );
+	vec3 stoneColour = diffuseColor.rgb * ( 0.88 + 0.24 * cloud );
+	stoneColour = mix( stoneColour, stoneColour * vec3( 0.8, 0.76, 0.72 ), wide * 0.35 + thin * 0.18 );
+	stoneColour *= 0.965 + 0.07 * speck;
+	diffuseColor.rgb = stoneColour;`,
+      )
       .replace(
         "#include <roughnessmap_fragment>",
         `#include <roughnessmap_fragment>
-	vec3 dustFacing = normalize( cross( dFdx( vDustWorld ), dFdy( vDustWorld ) ) );
-	float dust = smoothstep( 0.85, 0.98, abs( dustFacing.y ) ) * ( 0.6 + 0.4 * dHash( floor( vDustWorld * 160.0 ) ) ) * ${amount.toFixed(3)};
-	diffuseColor.rgb = mix( diffuseColor.rgb, vec3( 0.72, 0.68, 0.6 ), dust );
-	roughnessFactor = mix( roughnessFactor, 0.9, dust * 6.0 );`,
+	roughnessFactor *= 0.9 + 0.2 * cloud + 0.15 * thin;${cap ? CAP_DUST : ""}`,
+      )
+      .replace(
+        "#include <normal_fragment_maps>",
+        `#include <normal_fragment_maps>
+	vec3 pitAt = vStoneWorld * 140.0;
+	vec3 pit = vec3( sNoise( pitAt ), sNoise( pitAt + 19.1 ), sNoise( pitAt + 37.7 ) ) - 0.5;
+	normal = normalize( normal + ( viewMatrix * vec4( pit, 0.0 ) ).xyz * ${cap ? "0.03" : "0.07"} );`,
       );
   };
-  material.customProgramCacheKey = () => `dust${amount}`;
+  material.customProgramCacheKey = () => `plinthStone${cap ? "Cap" : ""}`;
 }
 
-/** Plinth stone: honed, with the cap a little more polished than the die, worn soft at its edges. */
+/** Plinth stone: honed limestone, the cap a little more polished than the die, worn soft at its edges. */
 function PlinthStone({ polish = false }: { polish?: boolean }) {
   return (
     <meshStandardMaterial
       ref={(m: THREE.MeshStandardMaterial | null) => {
         if (!m) return;
+        stone(m, polish);
         // the cap's top takes the figure's shadow as a decal (see Statue); the faces below take it here
-        if (polish) dusty(m, 0.05);
-        else receiveStatueShadow(m, 0.65);
+        if (!polish) receiveStatueShadow(m, 0.65);
       }}
-      color="#9a8a70"
-      roughness={polish ? 0.34 : 0.72}
+      color="#b3a58b"
+      roughness={polish ? 0.36 : 0.7}
       metalness={0}
       envMapIntensity={polish ? 0.75 : 0.45}
     />

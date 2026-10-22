@@ -19,13 +19,14 @@ import { WALL_H, Z_FAR } from "./corridorLayout";
 
 /** Where the statue stands down the hall. */
 export const STATUE_Z = Z_FAR + 4.2;
-/** Its key light: high and off to his right (see StatueLight in Corridor). */
-/*
-  Not so steep that the figure's shadow drops straight down behind his own
-  legs, out of sight: from here it falls back and to his left across the
-  plinth top and up the back wall, where it can be seen from the hall.
-*/
-export const STATUE_KEY: [number, number, number] = [-6.4, WALL_H - 6.0, STATUE_Z + 8.4];
+/**
+ * Its key light: in the ceiling over him, a little in front, the way the
+ * rooms light their exhibits (see StatueLight in Corridor). Straight down
+ * would leave his eyes in shadow, so it hangs a few steps toward the hall
+ * and the light falls on his face at a gallery angle. His shadow drops
+ * round his feet on the plinth top and a little behind him.
+ */
+export const STATUE_KEY: [number, number, number] = [0, WALL_H - 0.4, STATUE_Z + 2.8];
 
 const SIZE = 512;
 

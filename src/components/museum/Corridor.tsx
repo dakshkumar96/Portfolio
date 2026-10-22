@@ -438,11 +438,12 @@ function FarFocusInner() {
  * frame so the scene's light count is settled before anything is drawn.
  */
 /*
-  The statue's key light (STATUE_KEY, in statueShadow) hangs high and off
-  to his right, not straight in front. Lit from dead ahead, every fold of
-  the clothes faced the light and showed nothing; from the side and
-  above, the way a sculpture is lit in a gallery, each fold and edge
-  throws its own shadow and the carving reads.
+  The statue's key light (STATUE_KEY, in statueShadow) is a ceiling spot
+  just in front of him, warm and soft edged, the same kind of light that
+  hangs over every exhibit in the rooms. Coming from above, each fold of
+  the clothes is lit on top and shaded underneath, so the carving reads,
+  and the pool it makes runs out softly into the alcove instead of
+  slanting across it.
 */
 
 function StatueLight() {
@@ -451,11 +452,11 @@ function StatueLight() {
       <PoolLight
         position={STATUE_KEY}
         target={[0, STATUE_PLINTH_H + 1.9, STATUE_Z]}
-        intensity={450}
-        angle={0.3}
-        penumbra={0.9}
+        intensity={340}
+        angle={0.32}
+        penumbra={0.95}
         distance={26}
-        color="#ffd9a0"
+        color={GOLD.light}
         pin
       />
       {/* a gold rim from behind, about a third of the key, so his outline lifts off the niche */}

@@ -49,8 +49,9 @@ function StatueBeam({ from, to }: { from: THREE.Vector3; to: THREE.Vector3 }) {
   const layers = useMemo(() => {
     const length = from.distanceTo(to);
     // three widths, so the sides of the shaft fall away instead of ending
-    return [0.55, 0.38, 0.22].map((r, i) => ({
-      geometry: beamGeometry(length, length * Math.tan(0.3) * r * 1.5, 0.022 - i * 0.006),
+    // faint, as the haze over the exhibits in the rooms is: the light is seen in the air, never as a solid cone
+    return [0.62, 0.44, 0.26].map((r, i) => ({
+      geometry: beamGeometry(length, length * Math.tan(0.32) * r * 1.5, 0.009 - i * 0.0022),
     }));
   }, [from, to]);
   const group = useRef<THREE.Group>(null);
