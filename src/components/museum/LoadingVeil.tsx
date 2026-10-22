@@ -318,7 +318,6 @@ export function LoadingVeil({
         <Molding />
         <Band id="veil-ajrak-left" />
         <Pull />
-        <span className="veil-hud">Hall 00 / Entrance</span>
         <div className="veil-col">
           <span className="veil-mask">
             <span className="veil-word">{FIRST}</span>
@@ -332,7 +331,6 @@ export function LoadingVeil({
         <Molding />
         <Band id="veil-ajrak-right" />
         <Pull />
-        <span className="veil-hud">Est. 2026</span>
         <div className="veil-col">
           <span className="veil-mask">
             <span className="veil-word veil-word-last">{LAST}</span>

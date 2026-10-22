@@ -340,29 +340,6 @@
   left: 0;
 }
 
-/* labels in the top corners: where the visitor is, and since when */
-.veil-hud {
-  position: absolute;
-  top: 28px;
-  font-family: var(--veil-mono);
-  font-size: 10px;
-  font-weight: 400;
-  line-height: 1;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  white-space: nowrap;
-  color: var(--text-muted);
-  animation: veil-fade 0.6s ease 1.2s both;
-}
-
-.veil-panel-left .veil-hud {
-  left: 32px;
-}
-
-.veil-panel-right .veil-hud {
-  right: 32px;
-}
-
 /* ------------------------------------------------------------------ */
 /* The name                                                            */
 /* ------------------------------------------------------------------ */
@@ -740,15 +717,6 @@
     padding: 7px 12px;
     font-size: 11px;
   }
-  .veil-hud {
-    top: 20px;
-  }
-  .veil-panel-left .veil-hud {
-    left: 20px;
-  }
-  .veil-panel-right .veil-hud {
-    right: 20px;
-  }
   /* clear of the sound link in the corner below */
   .veil-status {
     bottom: 72px;
@@ -774,7 +742,6 @@
   .veil-arch path,
   .veil-band,
   .veil-pull,
-  .veil-hud,
   .veil-plate,
   .veil-status {
     animation: veil-fade 0.4s ease both;
