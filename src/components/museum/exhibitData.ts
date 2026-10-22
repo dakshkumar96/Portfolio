@@ -153,7 +153,8 @@ export const experienceExhibits: ExhibitDatum[] = [
   ]),
   // the left wall
   role("host", "Host", "Insanity Radio 103.2FM", "Part time · Oct 2026 to present · Egham, on site", [
-    "Host Artificial Insanity, a weekly hour long talk show on Insanity Radio, Royal Holloway's student and community station. The show explains the latest AI news in plain English for anyone, with a focus on how AI is changing everyday life, work and study.",
+    "Host Artificial Insanity, a live weekly show on Insanity Radio 103.2FM, Royal Holloway's student and community station. It goes out every Monday from 11am to 12pm.",
+    "The show is for people who think AI has nothing to do with them. It looks at how AI already shapes everyday life, from bills, jobs and water to education and even the way we think, in plain English with no tech background needed.",
     "Invite Royal Holloway academics and people working in industry as guests to share their perspective on where AI is heading.",
     "Some episodes also cover careers, student life and the everyday challenges international students face.",
     "Came in with no radio experience and took this on to push myself, get better at speaking live, and have honest conversations with interesting people.",
