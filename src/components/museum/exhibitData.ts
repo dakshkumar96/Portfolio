@@ -453,7 +453,7 @@ export const caseExhibits: ExhibitDatum[] = [
     room: "about",
     title: "Samsung Galaxy J2",
     meta: "Mobile telephone. Samsung, 2015",
-    body: "His first phone.",
+    body: "His first phone, which he got when he was still very young. He loved it, and spent most of his time on it playing games.",
     links: [{ label: "Model credits", href: "/credits" }],
   },
   {
@@ -461,16 +461,16 @@ export const caseExhibits: ExhibitDatum[] = [
     room: "about",
     title: "HP 14",
     meta: "Laptop computer. Hewlett-Packard",
-    body: "His first laptop, and the machine he learned to code and edit video on.",
+    body: "He talked his parents into buying it for him at 12, and still calls it the best decision of his life. Design, coding, video editing and his first freelance work all started on this machine. None of it would have happened without it.",
     links: [{ label: "Model credits", href: "/credits" }],
   },
   {
     id: "case-quantum",
     room: "skills",
     title: "Quantum Computing",
-    meta: "Model of a dilution refrigerator",
+    meta: "Model of a quantum computer",
     body:
-      "The gold chandelier people picture as a quantum computer is actually the refrigerator around it. Each stage is colder than the one above, until the qubits at the bottom sit just above absolute zero, cold enough for their quantum states to last. He reads about it for fun.",
+      "He used to hate chemistry, yet quantum computers are one of his favourite things to read about. He has always been drawn to complex, futuristic technology, and loves the physics of how these machines actually work.",
   },
   {
     id: "case-brain",
@@ -478,7 +478,7 @@ export const caseExhibits: ExhibitDatum[] = [
     title: "Brain and Neurons",
     meta: "Anatomical model",
     body:
-      "He reads about how working with AI changes the way people think, and where these models learn in ways similar to us.",
+      "He loves reading about psychology and how the human mind works. Right now he is most interested in how AI is changing our brains, from the way we think down to the level of neurons.",
     links: [{ label: "Model credits", href: "/credits" }],
   },
   {
@@ -486,7 +486,7 @@ export const caseExhibits: ExhibitDatum[] = [
     room: "art",
     title: "Cinema",
     meta: "Film camera",
-    body: "He watches a lot of films. It is the one thing he does purely for fun.",
+    body: "He has loved cinema since he was a child, all of it, from brain rot videos to Oscar winning films. What he loves most is how three hours in front of a screen can take you out of your own life for a while.",
   },
   {
     id: "case-claude",

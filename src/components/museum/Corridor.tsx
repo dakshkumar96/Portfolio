@@ -894,15 +894,19 @@ function CasesInner({
 }
 
 /**
- * The photographs along the hall, each in the bay across from a door,
- * under that bay's lamp: printed whole and graded into the museum's
- * palette like the About wall, in old, darkened gilt.
+ * The photographs along the hall, printed whole and graded into the
+ * museum's palette like the About wall, in old, darkened gilt.
+ *
+ * They hang at an even 36 apart from the entrance to the last door, so
+ * the walk meets one at its start, two through the middle and one at the
+ * end. The first is on the right before the first door, where the walk
+ * begins, and the rest face the right hand doors from the left wall.
  */
 const WHOLE_PRINT: PhotoCrop = { focus: [0.5, 0.5], zoom: 1, whole: true };
 const HALL_PICTURES: { z: number; side: 1 | -1; src: string; exhibit: ExhibitDatum }[] = [
-  { z: -16, side: 1, src: "/museum/corridor-flight.jpg", exhibit: hallExhibits[0] },
+  { z: 2, side: 1, src: "/museum/corridor-flight.jpg", exhibit: hallExhibits[0] },
   { z: -34, side: -1, src: "/museum/childhood.jpg", exhibit: childhoodExhibit },
-  { z: -88, side: 1, src: "/museum/hackathon.jpg", exhibit: hackathonExhibit },
+  { z: -70, side: -1, src: "/museum/hackathon.jpg", exhibit: hackathonExhibit },
   { z: -106, side: -1, src: "/museum/society.jpg", exhibit: societyExhibit },
 ];
 
@@ -1774,9 +1778,9 @@ export function Corridor({
       </Static>
       <Cases activeId={activeId} onSelect={onSelect} />
       {/*
-        The one picture hung in the hall: on the right-hand wall before the
-        first door, where the walk starts. The placeholder paintings that
-        used to hang along the hall are gone.
+        The photographs hung in the hall, spaced evenly along it (see
+        HALL_PICTURES). The placeholder paintings that used to hang along
+        the hall are gone.
       */}
       {HALL_PICTURES.map((pic) => (
         <HungPicture
