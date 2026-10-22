@@ -107,10 +107,10 @@ const stat = (figure: string, title: string[], line: string): PosterSpec => ({
 });
 
 const STATS = {
-  channels: stat("4+", ["Pages and", "Channels"], "Managed"),
-  followers: stat("5,000+", ["Followers"], "On one managed page, Palmy AI"),
+  channels: stat("4+", ["Pages and", "Channels"], "Run in past roles"),
+  followers: stat("5,000+", ["Followers"], "On a page I ran for Palmy AI"),
   videos: stat("150+", ["Videos", "Edited"], "End to end, across two YouTube channels"),
-  weekly: stat("50+", ["People", "Weekly"], "Engaged on campus activations, Higherin"),
+  weekly: stat("50+", ["Students", "Weekly"], "Reached as a Higherin campus ambassador"),
 };
 
 /**

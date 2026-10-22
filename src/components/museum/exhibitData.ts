@@ -351,14 +351,14 @@ export const artPieces: Record<string, ExhibitDatum> = {
   "stat-channels": piece(
     "stat-channels",
     "4+ Pages and Channels",
-    "Managed · from the marketing portfolio",
-    "Four or more pages and channels run at once, across a student society, a podcast company and two YouTube channels.",
+    "Run in past roles · from the marketing portfolio",
+    "Four or more pages and channels he has run in past roles, across a student society, a podcast company and two YouTube channels.",
   ),
   "stat-followers": piece(
     "stat-followers",
     "5,000+ Followers",
-    "One managed page · Palmy AI",
-    "One page he manages, grown past five thousand followers.",
+    "A page he ran · Palmy AI",
+    "A page he ran for Palmy AI, grown past five thousand followers.",
   ),
   "stat-videos": piece(
     "stat-videos",
@@ -368,9 +368,9 @@ export const artPieces: Record<string, ExhibitDatum> = {
   ),
   "stat-weekly": piece(
     "stat-weekly",
-    "50+ People Weekly",
-    "Campus activations · Higherin",
-    "Campus campaigns that reach fifty or more people every week.",
+    "50+ Students Weekly",
+    "Campus Ambassador · Higherin · Feb 2026 to May 2026",
+    "As a campus ambassador for Higherin, the UK's leading student careers platform, he represented it at Royal Holloway as part of a national network of more than 1,500 ambassadors. He ran campus campaigns, in person and online, that reached fifty or more students every week.",
   ),
   "series-system": piece(
     "system",
@@ -402,7 +402,7 @@ export const artBoards: ExhibitDatum[] = [
     title: "By the Numbers",
     meta: "From the marketing portfolio",
     body:
-      "Four or more pages and channels managed. One page grown past 5,000 followers. More than 150 videos edited end to end across two YouTube channels. Fifty people or more reached every week on campus. The International Society's Instagram went from 400 to 850 followers.",
+      "Four or more pages and channels run in past roles. One page grown past 5,000 followers. More than 150 videos edited end to end across two YouTube channels. Fifty or more students reached every week as a Higherin campus ambassador. The International Society's Instagram went from 400 to 850 followers.",
   },
 ];
 
