@@ -90,7 +90,7 @@ export const aboutExhibits: ExhibitDatum[] = [
     title: "Off the Clock",
     meta: "Practice and pastime",
     body:
-      "He meditates every day and journals every night. Away from code he works behind a bar, runs the International Society as president and does student ambassador work. The rest of his time goes on films and whatever music he is into that week.",
+      "He meditates every day and journals every night. Away from code he works behind a bar, runs the International Society as president and does student ambassador and hall life work. The rest of his time goes on films and whatever music he is into that week.",
   },
   /*
     The two cases either side of the photographs: the record behind the

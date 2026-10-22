@@ -162,7 +162,7 @@ export const projects: Project[] = [
     ],
     featured: false,
     year: "2025 to 2026",
-    status: "Ongoing",
+    status: "Past work",
   },
 ];
 
@@ -176,6 +176,46 @@ export type Experience = {
 };
 
 export const experience: Experience[] = [
+  {
+    slug: "nextround-founding-product-engineer",
+    org: "NextRound",
+    role: "Founding Product Engineer",
+    dates: "Oct 2026 to present",
+    bullets: [
+      "One of the first engineers at an early stage startup building evidence based hiring, working directly with the CEO on the core product.",
+      "Improving the portal and the candidate assessment experience, using feedback from early users to decide what to build first.",
+      "Helping shape the product roadmap as the platform takes on more clients.",
+    ],
+  },
+  {
+    slug: "insanity-radio-host",
+    org: "Insanity Radio 103.2FM",
+    role: "Host",
+    dates: "Oct 2026 to present",
+    bullets: [
+      "Host Artificial Insanity, a live weekly show every Monday from 11am to 12pm on how AI already shapes everyday life, for people who think it has nothing to do with them.",
+      "Bring on Royal Holloway academics and people from industry as guests to talk about where AI is heading.",
+    ],
+  },
+  {
+    slug: "royal-holloway-hall-life-assistant",
+    org: "Royal Holloway",
+    role: "Hall Life Assistant",
+    dates: "Sep 2026 to present",
+    bullets: [
+      "Support residents across halls, running kitchen and flat meetings to check in on wellbeing and catch problems early.",
+      "Mediate between flatmates and point residents to the right university support when something serious happens.",
+    ],
+  },
+  {
+    slug: "royal-holloway-student-ambassador",
+    org: "Royal Holloway",
+    role: "Student Ambassador",
+    dates: "Sep 2026 to present",
+    bullets: [
+      "Talk with prospective students and their families at open days and campus tours, and adapt how I present the university to each visitor.",
+    ],
+  },
   {
     slug: "royal-holloway-research-assistant",
     org: "Royal Holloway",
@@ -194,6 +234,25 @@ export const experience: Experience[] = [
     dates: "May 2026 to present",
     bullets: [
       "I run the society now. The year before, I was social media manager. I grew the Instagram by 112%, planned events, designed the posters and reels, and kept the content calendar going.",
+    ],
+  },
+  {
+    slug: "higherin-campus-ambassador",
+    org: "Higherin",
+    role: "Campus Ambassador",
+    dates: "Feb 2026 to May 2026",
+    bullets: [
+      "Represented Higherin, the UK's leading student careers platform, at Royal Holloway as part of a national network of more than 1,500 ambassadors.",
+      "Ran campus campaigns, in person and online, that reached 50+ students every week.",
+    ],
+  },
+  {
+    slug: "wetherspoon-bar-associate",
+    org: "J D Wetherspoon",
+    role: "Bar Associate",
+    dates: "Feb 2026 to present",
+    bullets: [
+      "Work bar and floor service at a large three floor pub in Windsor with a team of around 80, handling complaints calmly under pressure.",
     ],
   },
   {
