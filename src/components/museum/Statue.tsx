@@ -10,7 +10,8 @@ import { gildedLettering } from "./inscriptions";
 import { brushedMetalFor } from "./textures";
 import { useThree } from "@react-three/fiber";
 import { track } from "./preload";
-import { bakeStatueShadow, receiveStatueShadow, shadowOnTop } from "./statueShadow";
+import { bakeSelfShadow, bakeStatueShadow, receiveStatueShadow, selfShadow, shadowOnTop } from "./statueShadow";
+import { hasDebugFlag } from "./debug";
 
 /**
  * The statue at the end of the hall, on its plinth.
@@ -45,17 +46,37 @@ const SCAN = "/museum/statue.glb";
 const MARBLE = "#d9d2c4";
 
 /*
-  The stone's surface, worked out from where each point is in the room -
-  the scan carries no texture coordinates - so it needs no image at all:
-  value noise at a few scales gives the polish its variation (rougher and
-  glossier patches, about 2.5cm across), a faint vein drawn through it,
-  and a fine grain in the normal that catches the light at a glance.
+  The stone's surface, worked out from where each point is - the scan
+  carries no texture coordinates - so it needs no image at all: value
+  noise at a few scales gives the polish its variation, a faint vein runs
+  through it, and a fine grain in the normal catches the light at a glance.
 
-  Two touches of light that a lamp alone would not give real marble:
-    - the edges lit from behind - ears, fingers, the rim of the sleeves -
-      let a little warm light through, as thin stone does;
-    - the lit plinth throws a little light back up under the chin, the
-      arms and the trousers, never more than about six percent of the key.
+  The face, which is what a visitor looks at, is carved finer than the
+  rest. The scan marks which points are the head (its _head attribute),
+  and the places on it were found on a render of the model by face
+  landmarks, in the model's own units (one unit tall, origin between the
+  feet):
+    - the hair, above a hairline that runs low at the back, cut in fine
+      ridges that run front to back, as a carver chisels strands
+    - stubble on the jaw and chin below the mouth, a stipple of tiny pits
+    - each eye's iris cut as a fine ring and its pupil drilled, the way a
+      classical carver gives a marble eye its gaze
+    - the face a little glossier than the cloth
+  Over the whole figure, tiny chips where the stone stands proudest (its
+  convexity, carried in the vertex colour's alpha) and the faintest dust
+  settled in the deepest hollows.
+
+  How it is lit, beyond the lamps in the room:
+    - its own shadow from the key light, under the brow, the nose, the
+      lower lip and the chin, from a one-off bake (bakeSelfShadow); soft,
+      and wider where it falls further from what casts it
+    - a cool fill from the visitor's right, so the shadow side keeps a
+      tone and is never black
+    - a very soft light into the eye sockets from near the visitor's eye,
+      a little low, so they are never empty pits
+    - warm light along the edge of the shadow, where light passing into
+      thin stone comes back out, and through the edges lit from behind
+    - the lit plinth throwing a little light back up under the chin
 */
 const MARBLE_FRAG_HEAD = /* glsl */ `
 uniform vec3 uRimDir;
@@ -63,7 +84,34 @@ uniform vec3 uWarm;
 uniform float uGlow;
 uniform float uBounce;
 uniform float uCeil;
+uniform sampler2D uSelfShadowMap;
+uniform mat4 uSelfShadowMatrix;
+uniform vec2 uSelfShadowRange;
+uniform float uSelfShadowTexel;
+uniform float uSelfShadowWorldTexel;
+uniform float uShowShadow;
+uniform float uIndirect;
+uniform float uKeyGain;
+uniform float uSelfShadowOn;
+uniform vec3 uKeyWorld;
+uniform vec3 uRimWorld;
+uniform float uOther;
+uniform vec3 uKeyTint;
+uniform vec3 uFillDir;
+uniform vec3 uFillColor;
+uniform float uFill;
+uniform vec3 uEyeDir;
+uniform float uEyeLight;
+uniform float uWrap;
+uniform vec3 uIrisR;
+uniform vec3 uIrisL;
+uniform vec3 uEyeAxis;
+uniform vec3 uMouth;
+uniform vec3 uChin;
+uniform vec3 uDust;
 varying vec3 vMarbleWorld;
+varying vec3 vMarbleLocal;
+varying float vHead;
 float mHash( vec3 p ) { p = fract( p * 0.3183099 + 0.1 ); p *= 17.0; return fract( p.x * p.y * p.z * ( p.x + p.y + p.z ) ); }
 float mNoise( vec3 x ) {
 	vec3 i = floor( x ); vec3 f = fract( x ); f = f * f * ( 3.0 - 2.0 * f );
@@ -71,56 +119,244 @@ float mNoise( vec3 x ) {
 		mix( mix( mHash( i + vec3( 0, 0, 1 ) ), mHash( i + vec3( 1, 0, 1 ) ), f.x ), mix( mHash( i + vec3( 0, 1, 1 ) ), mHash( i + vec3( 1, 1, 1 ) ), f.x ), f.y ), f.z );
 }
 float mFbm( vec3 p ) { return 0.5 * mNoise( p ) + 0.25 * mNoise( p * 2.03 ) + 0.125 * mNoise( p * 4.01 ); }
+
+const vec2 DISK[ 16 ] = vec2[ 16 ](
+	vec2( -0.942, -0.399 ), vec2( 0.946, -0.769 ), vec2( -0.094, -0.929 ), vec2( 0.345, 0.294 ),
+	vec2( -0.916, 0.458 ), vec2( -0.815, -0.879 ), vec2( -0.383, 0.277 ), vec2( 0.975, 0.756 ),
+	vec2( 0.443, -0.975 ), vec2( 0.537, -0.474 ), vec2( -0.265, -0.419 ), vec2( 0.792, 0.191 ),
+	vec2( -0.242, 0.997 ), vec2( -0.814, 0.914 ), vec2( 0.200, 0.786 ), vec2( 0.144, -0.141 )
+);
+
+/*
+  How much of the key light reaches a point, from the bake: the point is
+  moved a little off the surface along its normal (more where the light
+  grazes it) so the stone never shadows itself in specks, then a search
+  round it finds what lies between it and the lamp, and how far above:
+  the further the caster, the wider the soft edge, from about one and a
+  half texels where they touch to six. Each sample further out is allowed
+  to sit that much nearer the lamp before it counts, by the slope of the
+  surface to the light: on a face turned steeply from a lamp overhead, the
+  stone a few texels away really is nearer the lamp, and is not a shadow.
+*/
+float keyLight( vec3 p, vec3 n ) {
+	if ( uSelfShadowOn < 0.5 ) return 1.0;
+	vec3 L = normalize( uKeyWorld - p );
+	float ndl = max( dot( n, L ), 0.08 );
+	float slope = min( sqrt( 1.0 - ndl * ndl ) / ndl, 6.0 ) * uSelfShadowWorldTexel;
+	vec3 q = p + n * 0.02 * ( 1.5 - ndl );
+	vec4 c = uSelfShadowMatrix * vec4( q, 1.0 );
+	if ( c.w <= 0.0 ) return 1.0;
+	vec2 uv = c.xy / c.w * 0.5 + 0.5;
+	if ( uv.x <= 0.0 || uv.y <= 0.0 || uv.x >= 1.0 || uv.y >= 1.0 ) return 1.0;
+	float range = uSelfShadowRange.y - uSelfShadowRange.x;
+	float here = ( distance( q, uKeyWorld ) - uSelfShadowRange.x - 0.003 ) / range;
+	float blockers = 0.0;
+	float found = 0.0;
+	for ( int i = 0; i < 16; i ++ ) {
+		float d = texture2D( uSelfShadowMap, uv + DISK[ i ] * 6.0 * uSelfShadowTexel ).r;
+		if ( d < here - slope * 6.0 * length( DISK[ i ] ) / range ) { blockers += d; found += 1.0; }
+	}
+	if ( found < 0.5 ) return 1.0;
+	float gap = ( here - blockers / found ) * range;
+	float texels = clamp( 1.5 + gap * 25.0, 1.5, 6.0 );
+	float lit = 0.0;
+	for ( int i = 0; i < 16; i ++ ) {
+		float allow = slope * texels * length( DISK[ i ] ) / range;
+		lit += texture2D( uSelfShadowMap, uv + DISK[ i ] * texels * uSelfShadowTexel ).r < here - allow ? 0.0 : 1.0;
+	}
+	return lit / 16.0;
+}
+
+/* the slope a ring cut and a drilled pupil give the surface of an eye, along the eye's own face */
+vec3 carveEye( vec3 p, vec3 centre, inout float shade ) {
+	vec3 r = p - centre;
+	vec3 across = r - dot( r, uEyeAxis ) * uEyeAxis;
+	float d = length( across );
+	if ( d > 0.007 ) return vec3( 0.0 );
+	vec3 outward = across / max( d, 1e-5 );
+	// a narrow groove round the iris
+	float x = d - 0.0040;
+	float tilt = - 2.0 * 0.6 * ( x / 0.0006 ) * exp( - x * x / ( 0.0006 * 0.0006 ) );
+	// the pupil, a shallow bowl, shadowed in its depth
+	if ( d < 0.0015 ) {
+		tilt -= 0.7 * d / 0.0015;
+		shade *= 0.55 + 0.45 * d / 0.0015;
+	}
+	return outward * tilt;
+}
 `;
 
 /** The marble's brightest light before tone mapping: kept so no pixel of the statue goes past 0.95 on screen. */
-const MARBLE_CEIL = { value: 0.82 };
+const MARBLE_CEIL = { value: 0.81 };
+
+/** The places on the face, in the model's own units, found on a render by face landmarks. */
+const FACE = {
+  irisR: new THREE.Vector3(-0.00392, 0.90317, 0.03468),
+  irisL: new THREE.Vector3(0.03879, 0.89812, 0.03309),
+  mouth: new THREE.Vector3(0.0144, 0.8533, 0.028),
+  chin: new THREE.Vector3(0.01109, 0.82978, 0.01658),
+  // the head is bowed, so the face looks a little down
+  eyeAxis: new THREE.Vector3(0, -0.283, 0.959).normalize(),
+};
+
+/** The statue's lighting and carving, shared by every program the marble compiles into. */
+const MARBLE_UNIFORMS = {
+  uRimDir: { value: new THREE.Vector3(0, 0.6, -1).normalize() },
+  uWarm: { value: new THREE.Color("#e8c882") },
+  uGlow: { value: 0.05 },
+  // the plinth's light under the chin: well under five percent of the key
+  uBounce: { value: 0.03 },
+  uCeil: MARBLE_CEIL,
+  uKeyTint: { value: new THREE.Color("#ffcc78") },
+  // the cool fill, from the visitor's right and a little above
+  uFillDir: { value: new THREE.Vector3(1, 0.3, 1.1).normalize() },
+  uFillColor: { value: new THREE.Color("#334455") },
+  uFill: { value: 0.08 },
+  // the light near the visitor's eye, a little below the statue's, into the eye sockets only: about 8% of the key there
+  uEyeDir: { value: new THREE.Vector3(0, -0.2, 1).normalize() },
+  uEyeLight: { value: 0.18 },
+  uWrap: { value: 0.12 },
+  uIrisR: { value: FACE.irisR },
+  uIrisL: { value: FACE.irisL },
+  uEyeAxis: { value: FACE.eyeAxis },
+  uMouth: { value: FACE.mouth },
+  uChin: { value: FACE.chin },
+  uDust: { value: new THREE.Color("#6b5d4a") },
+  uShowShadow: { value: 0 },
+  /*
+    How much of the room's general light (its ambient, sky and floor
+    bounce, and reflections) the statue takes. All of it filled every
+    shadow on the face to within a stop and a half of the lit side; the
+    statue's own fill does that job instead, in a cool tone, at about a
+    quarter of the key.
+  */
+  uIndirect: { value: 0.28 },
+  // the key on the stone, a little stronger than on the plinth and floor, so the face carries the light
+  uKeyGain: { value: 1.6 },
+  /*
+    The hall's other lamps - the alcove's side lights, the nearest door's -
+    reach the face too, from directions the key's shadow knows nothing
+    about, and lit every shadow on it back up. The statue takes only a
+    part of them; its key and its rim are its own.
+  */
+  uOther: { value: 0.08 },
+  ...selfShadow,
+};
+if (typeof window !== "undefined" && hasDebugFlag()) (window as unknown as { __marble?: typeof MARBLE_UNIFORMS }).__marble = MARBLE_UNIFORMS;
+
+/* the key light's own term, picked out of the spotlight loop by where the light hangs, takes the statue's shadow */
+const KEY_IN_LOOP = "\t\tgetSpotLightInfo( spotLight, geometryPosition, directLight );";
 
 function shadeMarble(shader: THREE.WebGLProgramParametersWithUniforms) {
-  Object.assign(shader.uniforms, {
-    uRimDir: { value: new THREE.Vector3(0, 0.6, -1).normalize() },
-    uWarm: { value: new THREE.Color("#e8c882") },
-    uGlow: { value: 0.05 },
-    uBounce: { value: 0.035 },
-    uCeil: MARBLE_CEIL,
-  });
+  Object.assign(shader.uniforms, MARBLE_UNIFORMS);
   shader.vertexShader = shader.vertexShader
-    .replace("void main() {", `varying vec3 vMarbleWorld;
+    .replace("void main() {", `attribute float _head;
+varying vec3 vMarbleWorld;
+varying vec3 vMarbleLocal;
+varying float vHead;
 void main() {`)
     .replace("#include <project_vertex>", `#include <project_vertex>
-	vMarbleWorld = ( modelMatrix * vec4( transformed, 1.0 ) ).xyz;`);
+	vMarbleWorld = ( modelMatrix * vec4( transformed, 1.0 ) ).xyz;
+	vMarbleLocal = transformed;
+	vHead = _head;`);
+  const lights = THREE.ShaderChunk.lights_fragment_begin.replace(
+    KEY_IN_LOOP,
+    `${KEY_IN_LOOP}\n\t\tif ( distance( spotLight.position, marbleKeyView ) < 0.05 ) directLight.color *= marbleKeyLit * uKeyGain;
+		else if ( distance( spotLight.position, marbleRimView ) > 0.05 ) directLight.color *= uOther;`,
+  );
   shader.fragmentShader = shader.fragmentShader
     .replace("void main() {", `${MARBLE_FRAG_HEAD}
 void main() {`)
     .replace(
       "#include <color_fragment>",
       `#include <color_fragment>
+	vec3 lp = vMarbleLocal;
 	// a faint vein, wandering through the block
 	float veinWarp = mFbm( vMarbleWorld * 1.6 );
 	float vein = 1.0 - smoothstep( 0.0, 0.07, abs( sin( ( vMarbleWorld.x * 0.9 + vMarbleWorld.y * 0.55 + veinWarp * 3.5 ) * 3.1 ) ) );
-	diffuseColor.rgb *= 1.0 - 0.06 * vein;`,
+	diffuseColor.rgb *= 1.0 - 0.05 * vein;
+	// the hair, above a hairline that runs low at the back of the head
+	float hairLine = mix( 0.875, 0.936, smoothstep( -0.04, 0.03, lp.z ) );
+	float hair = vHead * smoothstep( hairLine, hairLine + 0.006, lp.y );
+	// the stubble: below the mouth to the chin, across the jaw, and never on the lips
+	vec3 fromMouth = lp - uMouth;
+	float stubble = vHead
+		* smoothstep( - 0.003, - 0.007, fromMouth.y )
+		* smoothstep( uChin.y - 0.016, uChin.y - 0.008, lp.y )
+		* ( 1.0 - smoothstep( 0.03, 0.046, abs( fromMouth.x ) ) )
+		* smoothstep( - 0.07, - 0.04, fromMouth.z )
+		* smoothstep( 0.006, 0.010, length( fromMouth.xy ) );
+	// chips where the stone stands proudest, dust where it is deepest
+	#ifdef USE_COLOR_ALPHA
+	float proud = 1.0 - vColor.a;
+	#else
+	float proud = 0.0;
+	#endif
+	float chip = step( 0.86, mNoise( lp * 700.0 ) ) * smoothstep( 0.35, 0.75, proud );
+	diffuseColor.rgb *= 1.0 - 0.1 * chip;
+	float hollow = 1.0 - vColor.r;
+	diffuseColor.rgb = mix( diffuseColor.rgb, uDust, 0.05 * smoothstep( 0.08, 0.3, hollow ) );
+	// the eyes: the iris ring and the drilled pupil, and the pupil's shade
+	float eyeShade = 1.0;
+	vec3 eyeCut = vHead * ( carveEye( lp, uIrisR, eyeShade ) + carveEye( lp, uIrisL, eyeShade ) );
+	diffuseColor.rgb *= mix( 1.0, eyeShade, vHead );`,
     )
     .replace(
       "#include <roughnessmap_fragment>",
       `#include <roughnessmap_fragment>
-	roughnessFactor = mix( 0.32, 0.5, mFbm( vMarbleWorld * 40.0 ) );`,
+	float polish = mFbm( vMarbleWorld * 40.0 );
+	// the face a little glossier than the cloth; the hair matte, as chiselled stone is
+	roughnessFactor = mix( mix( 0.32, 0.5, polish ), mix( 0.28, 0.42, polish ), vHead );
+	roughnessFactor = mix( roughnessFactor, 0.55, hair );
+	roughnessFactor = min( 1.0, roughnessFactor + 0.15 * chip );`,
     )
     .replace(
       "#include <normal_fragment_maps>",
       `#include <normal_fragment_maps>
 	vec3 grainAt = vMarbleWorld * 240.0;
 	vec3 grain = vec3( mNoise( grainAt ), mNoise( grainAt + 17.3 ), mNoise( grainAt + 41.7 ) ) - 0.5;
-	normal = normalize( normal + ( viewMatrix * vec4( grain, 0.0 ) ).xyz * 0.022 );`,
+	vec3 carve = grain * 0.022;
+	// strands: fine ridges across the head, long from front to back
+	vec3 strandAt = lp * vec3( 900.0, 900.0, 60.0 );
+	carve += vec3( mNoise( strandAt ) - 0.5, mNoise( strandAt + 13.1 ) - 0.5, 0.0 ) * 0.3 * hair;
+	// stubble: a stipple of tiny pits
+	vec3 pitAt = floor( lp * 2600.0 );
+	carve += ( vec3( mHash( pitAt ), mHash( pitAt + 7.7 ), mHash( pitAt + 3.3 ) ) - 0.5 ) * 0.22 * stubble * step( 0.55, mHash( pitAt + 1.9 ) );
+	carve += ( grain * 0.6 ) * chip;
+	carve += eyeCut;
+	normal = normalize( normal + ( viewMatrix * vec4( carve, 0.0 ) ).xyz );`,
+    )
+    .replace(
+      "#include <lights_fragment_begin>",
+      `vec3 marbleNW = normalize( ( vec4( normal, 0.0 ) * viewMatrix ).xyz );
+	float marbleKeyLit = keyLight( vMarbleWorld, marbleNW );
+	vec3 marbleKeyView = ( viewMatrix * vec4( uKeyWorld, 1.0 ) ).xyz;
+	vec3 marbleRimView = ( viewMatrix * vec4( uRimWorld, 1.0 ) ).xyz;
+${lights}`,
+    )
+    .replace(
+      "#include <lights_fragment_end>",
+      `#include <lights_fragment_end>
+	reflectedLight.indirectDiffuse *= uIndirect;
+	reflectedLight.indirectSpecular *= mix( 1.0, uIndirect, 0.5 );`,
     )
     .replace(
       "#include <opaque_fragment>",
       `{
-		vec3 nW = normalize( ( vec4( normal, 0.0 ) * viewMatrix ).xyz );
+		vec3 nW = marbleNW;
 		vec3 toEye = normalize( cameraPosition - vMarbleWorld );
 		float through = pow( clamp( dot( toEye, - normalize( uRimDir + nW * 0.35 ) ), 0.0, 1.0 ), 4.0 );
 		float edge = pow( 1.0 - abs( dot( nW, toEye ) ), 2.0 );
 		outgoingLight += uWarm * uGlow * through * ( 0.4 + 0.6 * edge );
 		outgoingLight += uWarm * uBounce * clamp( - nW.y, 0.0, 1.0 ) * diffuseColor.rgb;
+		// the fill keeps the shadow side in tone; the eye light reaches only the eye sockets
+		outgoingLight += uFillColor * uFill * ( 0.5 + 0.5 * dot( nW, uFillDir ) ) * diffuseColor.rgb;
+		float socket = vHead * ( 1.0 - smoothstep( 0.012, 0.026, min( distance( lp, uIrisR ), distance( lp, uIrisL ) ) ) );
+		outgoingLight += uKeyTint * uEyeLight * socket * max( dot( nW, uEyeDir ), 0.0 ) * diffuseColor.rgb;
+		// light coming back out of the stone just past the shadow's edge
+		float nl = dot( nW, normalize( uKeyWorld - vMarbleWorld ) );
+		float wrapBand = clamp( ( nl + 0.25 ) / 1.25, 0.0, 1.0 ) - clamp( nl, 0.0, 1.0 ) + ( 1.0 - marbleKeyLit ) * clamp( nl, 0.0, 1.0 ) * 0.25;
+		outgoingLight += uKeyTint * uWrap * wrapBand * diffuseColor.rgb;
 		// a soft shoulder under the ceiling, so the brightest glint rolls off instead of clipping to white
 		float peak = max( max( outgoingLight.r, outgoingLight.g ), outgoingLight.b );
 		float knee = uCeil * 0.6;
@@ -128,6 +364,8 @@ void main() {`)
 			float room = uCeil - knee;
 			outgoingLight *= ( knee + room * ( 1.0 - exp( - ( peak - knee ) / room ) ) ) / peak;
 		}
+		// checking only (?debug): the key light's shadow on its own, white lit, black shadowed
+		if ( uShowShadow > 0.5 ) outgoingLight = vec3( marbleKeyLit * 0.8 );
 	}
 	#include <opaque_fragment>`,
     );
@@ -143,22 +381,22 @@ export function marble() {
       vertexColors: true,
       roughness: 0.4,
       metalness: 0,
-      clearcoat: 0.08,
-      clearcoatRoughness: 0.35,
+      clearcoat: 0.1,
+      clearcoatRoughness: 0.4,
       envMapIntensity: 0.55,
       emissive: new THREE.Color("#ffd9a0"),
       /*
         The faintest light of its own, so the shadowed side is never dead
         black. It used to be several times this, which lit him evenly from
-        within and flattened every fold; the key light from the side
-        (StatueLight in Corridor) is what carves him now.
+        within and flattened every fold; the key light (StatueLight in
+        Corridor) is what carves him now.
       */
       emissiveIntensity: 0.03,
       // the open overshirt is a single sheet of stone, seen from both sides
       side: THREE.DoubleSide,
     });
     marbleMaterial.onBeforeCompile = shadeMarble;
-    marbleMaterial.customProgramCacheKey = () => "marble";
+    marbleMaterial.customProgramCacheKey = () => "marble2";
   }
   return marbleMaterial;
 }
@@ -558,6 +796,8 @@ export function Statue({ position }: { position: [number, number, number] }) {
         const group = figure.current;
         if (group) {
           const bake = bakeStatueShadow(gl, group);
+          // and its shadow on itself, under the brow, the nose and the chin
+          bakeSelfShadow(gl, group);
           const top = group.getWorldPosition(new THREE.Vector3());
           setTopShadow(shadowOnTop(bake, top, FOOT_SPAN));
         }

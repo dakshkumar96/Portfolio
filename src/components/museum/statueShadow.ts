@@ -27,6 +27,8 @@ export const STATUE_Z = Z_FAR + 4.2;
  * round his feet on the plinth top and a little behind him.
  */
 export const STATUE_KEY: [number, number, number] = [0, WALL_H - 0.4, STATUE_Z + 2.8];
+/** The gold rim light, high in the niche behind him (the plinth is 1.45 tall). */
+export const STATUE_RIM: [number, number, number] = [0, 1.45 + 4.2, Z_FAR + 0.9];
 
 const SIZE = 512;
 
@@ -251,4 +253,98 @@ export function shadowOnTop(bake: { at: (p: THREE.Vector3) => number }, centre: 
   tex.minFilter = THREE.LinearFilter;
   tex.needsUpdate = true;
   return tex;
+}
+
+/*
+  The statue's shadow on itself: under the brow, the nose, the lower lip
+  and the chin, the arm across the chest.
+
+  The same light, the same one-off bake, but kept sharp and detailed: the
+  key light's view is fitted to the figure's bounds with a tenth to spare,
+  drawn at 2048 (1024 on a phone), and the distance from the lamp stored
+  as it is, unblurred. The marble's shader reads it itself and softens it
+  there, wider where the shadow falls further from what casts it, the way
+  a lamp of real size casts (see shadeMarble in Statue). Nothing is drawn
+  again after the bake.
+*/
+const unlit = new THREE.DataTexture(new Float32Array([1, 1, 1, 1]), 1, 1, THREE.RGBAFormat, THREE.FloatType);
+unlit.needsUpdate = true;
+
+/** Read by the marble; filled in by bakeSelfShadow. `on` stays 0 if the device cannot draw the bake. */
+export const selfShadow = {
+  uSelfShadowMap: { value: unlit as THREE.Texture },
+  uSelfShadowMatrix: { value: new THREE.Matrix4() },
+  uSelfShadowRange: { value: new THREE.Vector2(0, 1) },
+  uSelfShadowTexel: { value: 1 / 2048 },
+  /** how wide one of the bake's pixels is on the figure, in metres */
+  uSelfShadowWorldTexel: { value: 0.002 },
+  uSelfShadowOn: { value: 0 },
+  uKeyWorld: { value: new THREE.Vector3(...STATUE_KEY) },
+  uRimWorld: { value: new THREE.Vector3(...STATUE_RIM) },
+};
+
+let selfTarget: THREE.WebGLRenderTarget | null = null;
+
+export function bakeSelfShadow(gl: THREE.WebGLRenderer, figure: THREE.Object3D) {
+  if (!gl.capabilities.isWebGL2 || !gl.extensions.has("EXT_color_buffer_float")) return;
+  const small = typeof window !== "undefined" && window.matchMedia("(pointer: coarse)").matches;
+  const size = small ? 1024 : 2048;
+  figure.updateWorldMatrix(true, true);
+  const box = new THREE.Box3().setFromObject(figure);
+  const sphere = box.getBoundingSphere(new THREE.Sphere());
+  const light = new THREE.Vector3(...STATUE_KEY);
+  const d = light.distanceTo(sphere.center);
+  // the figure's bounds and a tenth more, so the map's pixels are spent on the stone and nothing else
+  const reach = sphere.radius * 1.1;
+  const cam = new THREE.PerspectiveCamera((2 * Math.asin(Math.min(0.99, reach / d)) * 180) / Math.PI, 1, Math.max(0.1, d - reach), d + reach);
+  cam.position.copy(light);
+  cam.lookAt(sphere.center);
+  cam.updateMatrixWorld();
+  cam.updateProjectionMatrix();
+  const near = d - reach;
+  const far = d + reach;
+
+  const material = new THREE.ShaderMaterial({
+    side: THREE.DoubleSide,
+    uniforms: { uLight: { value: light }, uNear: { value: near }, uFar: { value: far } },
+    vertexShader: "varying vec3 vW; void main() { vec4 w = modelMatrix * vec4(position, 1.0); vW = w.xyz; gl_Position = projectionMatrix * viewMatrix * w; }",
+    fragmentShader: "uniform vec3 uLight; uniform float uNear; uniform float uFar; varying vec3 vW; void main() { gl_FragColor = vec4((distance(vW, uLight) - uNear) / (uFar - uNear), 0.0, 0.0, 1.0); }",
+  });
+  const stage = new THREE.Scene();
+  figure.traverse((o) => {
+    const mesh = o as THREE.Mesh;
+    if (!mesh.isMesh) return;
+    const copy = new THREE.Mesh(mesh.geometry, material);
+    copy.matrixAutoUpdate = false;
+    copy.matrix.copy(mesh.matrixWorld);
+    copy.matrixWorld.copy(mesh.matrixWorld);
+    stage.add(copy);
+  });
+
+  selfTarget?.dispose();
+  selfTarget = new THREE.WebGLRenderTarget(size, size, {
+    type: THREE.FloatType,
+    format: THREE.RedFormat,
+    minFilter: THREE.NearestFilter,
+    magFilter: THREE.NearestFilter,
+    depthBuffer: true,
+  });
+  const previous = gl.getRenderTarget();
+  const clear = gl.getClearColor(new THREE.Color());
+  const clearAlpha = gl.getClearAlpha();
+  gl.setRenderTarget(selfTarget);
+  // nothing in the way reads as far beyond the figure
+  gl.setClearColor(0xffffff, 1);
+  gl.clear();
+  gl.render(stage, cam);
+  gl.setRenderTarget(previous);
+  gl.setClearColor(clear, clearAlpha);
+  material.dispose();
+
+  selfShadow.uSelfShadowMap.value = selfTarget.texture;
+  selfShadow.uSelfShadowMatrix.value.multiplyMatrices(cam.projectionMatrix, cam.matrixWorldInverse);
+  selfShadow.uSelfShadowRange.value.set(near, far);
+  selfShadow.uSelfShadowTexel.value = 1 / size;
+  selfShadow.uSelfShadowWorldTexel.value = (2 * reach) / size;
+  selfShadow.uSelfShadowOn.value = 1;
 }

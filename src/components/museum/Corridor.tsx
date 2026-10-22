@@ -24,7 +24,7 @@ import { Vault, StoneMaterial } from "./Vault";
 import { EndWall } from "./EndWall";
 import { Atmosphere } from "./Atmosphere";
 import { Statue, PLINTH_H as STATUE_PLINTH_H } from "./Statue";
-import { STATUE_KEY, STATUE_Z, receiveStatueShadow } from "./statueShadow";
+import { STATUE_KEY, STATUE_RIM, STATUE_Z, receiveStatueShadow } from "./statueShadow";
 import { RoomShell } from "./RoomShell";
 import { SPOT_COUNT, spotPlan } from "./roomLayout";
 import { CaseContents } from "./CaseModels";
@@ -462,7 +462,7 @@ function StatueLight() {
       />
       {/* a gold rim from behind, about a third of the key, so his outline lifts off the niche */}
       <PoolLight
-        position={[0, STATUE_PLINTH_H + 4.2, Z_FAR + 0.9]}
+        position={STATUE_RIM}
         target={[0, STATUE_PLINTH_H + 1.7, STATUE_Z + 1.5]}
         intensity={240}
         angle={0.55}
