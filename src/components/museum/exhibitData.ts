@@ -534,7 +534,7 @@ export const childhoodExhibit: ExhibitDatum = {
   title: "Where It Started",
   meta: "Photograph. Childhood, at home",
   body:
-    "Daksh as a boy, in a checked shirt and sunglasses a size too big, tilting his head for the camera. This was long before the flight, the degree and his first line of code.",
+    "Daksh as a boy, in sunglasses a size too big. He was never a good student. He was a back bencher who could barely pass his exams, and his parents, teachers and friends all made fun of him for it. To most people he looked like a loser. He never believed them. Deep down he was sure he was special and that he would make it big, and he still believes it. If you pass on him, it's your loss.",
 };
 
 export const exhibitsByRoom: Record<RoomId, ExhibitDatum[]> = {
