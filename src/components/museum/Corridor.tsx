@@ -897,16 +897,18 @@ function CasesInner({
  * The photographs along the hall, printed whole and graded into the
  * museum's palette like the About wall, in old, darkened gilt.
  *
- * They hang at an even 36 apart from the entrance to the last door, so
- * the walk meets one at its start, two through the middle and one at the
- * end. The first is on the right before the first door, where the walk
- * begins, and the rest face the right hand doors from the left wall.
+ * They alternate sides, two on each wall, spread from the entrance to
+ * the last door, so the walk meets one at its start, two through the
+ * middle and one at the end. The first is on the right before the first
+ * door, where the walk begins. The left two face the Experience and
+ * Contact doors. The third hangs on the right across from the cinema case,
+ * clear of the Skills door, since a picture can't hang where a door is.
  */
 const WHOLE_PRINT: PhotoCrop = { focus: [0.5, 0.5], zoom: 1, whole: true };
 const HALL_PICTURES: { z: number; side: 1 | -1; src: string; exhibit: ExhibitDatum }[] = [
   { z: 2, side: 1, src: "/museum/corridor-flight.jpg", exhibit: hallExhibits[0] },
   { z: -34, side: -1, src: "/museum/childhood.jpg", exhibit: childhoodExhibit },
-  { z: -70, side: -1, src: "/museum/hackathon.jpg", exhibit: hackathonExhibit },
+  { z: -79, side: 1, src: "/museum/hackathon.jpg", exhibit: hackathonExhibit },
   { z: -106, side: -1, src: "/museum/society.jpg", exhibit: societyExhibit },
 ];
 
