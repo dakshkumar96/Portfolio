@@ -12,6 +12,7 @@ import { useThree } from "@react-three/fiber";
 import { track } from "./preload";
 import { bakeSelfShadow, bakeStatueShadow, receiveStatueShadow, selfShadow, shadowOnTop } from "./statueShadow";
 import { hasDebugFlag } from "./debug";
+import { FACE_LINES, FACE_POINTS } from "./faceLines";
 
 /**
  * The statue at the end of the hall, on its plinth.
@@ -78,7 +79,13 @@ const MARBLE = "#d9d2c4";
       thin stone comes back out, and through the edges lit from behind
     - the lit plinth throwing a little light back up under the chin
 */
+/** Where each line of the face starts in its texture and how many points it has, for the shader. */
+const FACE_DEFINES = Object.entries(FACE_LINES)
+  .map(([k, v]) => `#define F_${k.toUpperCase()} ${v.at}, ${v.n}`)
+  .join("\n");
+
 const MARBLE_FRAG_HEAD = /* glsl */ `
+${FACE_DEFINES}
 uniform vec3 uRimDir;
 uniform vec3 uWarm;
 uniform float uGlow;
@@ -92,6 +99,7 @@ uniform float uSelfShadowWorldTexel;
 uniform float uShowShadow;
 uniform float uIndirect;
 uniform float uKeyGain;
+uniform float uExposure;
 uniform float uSelfShadowOn;
 uniform vec3 uKeyWorld;
 uniform vec3 uRimWorld;
@@ -109,6 +117,7 @@ uniform vec3 uEyeAxis;
 uniform vec3 uMouth;
 uniform vec3 uChin;
 uniform vec3 uDust;
+uniform sampler2D uFace;
 varying vec3 vMarbleWorld;
 varying vec3 vMarbleLocal;
 varying float vHead;
@@ -167,6 +176,41 @@ float keyLight( vec3 p, vec3 n ) {
 	return lit / 16.0;
 }
 
+vec3 facePt( int i ) { return texelFetch( uFace, ivec2( i, 0 ), 0 ).xyz; }
+
+/* how far p is from a line of the face (n points from a), and which way, along the surface, is away from it */
+float faceLine( vec3 p, int a, int n, out vec3 away ) {
+	float best = 1e9;
+	away = vec3( 0.0 );
+	vec3 prev = facePt( a );
+	for ( int i = 1; i < 16; i ++ ) {
+		if ( i >= n ) break;
+		vec3 cur = facePt( a + i );
+		vec3 ab = cur - prev;
+		float t = clamp( dot( p - prev, ab ) / max( dot( ab, ab ), 1e-12 ), 0.0, 1.0 );
+		vec3 q = prev + t * ab;
+		float d = length( p - q );
+		if ( d < best ) { best = d; away = ( p - q ) / max( d, 1e-6 ); }
+		prev = cur;
+	}
+	return best;
+}
+
+/*
+  A carved line: a groove (depth above nought) or a ridge (below), of a
+  given width, with the stone in a groove a little shaded, as carving holds
+  shadow. Its slope tilts the surface's normal, so the light reads it.
+*/
+void carveLine( vec3 p, vec3 n, int a, int cnt, float depth, float width, float dark, inout vec3 carve, inout float shade ) {
+	vec3 away;
+	float d = faceLine( p, a, cnt, away );
+	if ( d > width * 3.0 ) return;
+	float x = d / width;
+	float e = exp( - x * x );
+	carve -= ( away - dot( away, n ) * n ) * ( 2.0 * depth / width ) * x * e;
+	shade *= 1.0 - dark * e;
+}
+
 /* the slope a ring cut and a drilled pupil give the surface of an eye, along the eye's own face */
 vec3 carveEye( vec3 p, vec3 centre, inout float shade ) {
 	vec3 r = p - centre;
@@ -187,17 +231,29 @@ vec3 carveEye( vec3 p, vec3 centre, inout float shade ) {
 `;
 
 /** The marble's brightest light before tone mapping: kept so no pixel of the statue goes past 0.95 on screen. */
-const MARBLE_CEIL = { value: 0.81 };
+const MARBLE_CEIL = { value: 0.8 };
 
 /** The places on the face, in the model's own units, found on a render by face landmarks. */
+const facePoint = (line: keyof typeof FACE_LINES, i = 0) => new THREE.Vector3(...FACE_POINTS[FACE_LINES[line].at + i]);
 const FACE = {
-  irisR: new THREE.Vector3(-0.00392, 0.90317, 0.03468),
-  irisL: new THREE.Vector3(0.03879, 0.89812, 0.03309),
-  mouth: new THREE.Vector3(0.0144, 0.8533, 0.028),
+  irisR: facePoint("irises", 0),
+  irisL: facePoint("irises", 1),
+  // the middle of the mouth's line
+  mouth: facePoint("mouth", 5),
   chin: new THREE.Vector3(0.01109, 0.82978, 0.01658),
   // the head is bowed, so the face looks a little down
   eyeAxis: new THREE.Vector3(0, -0.283, 0.959).normalize(),
 };
+
+/** Every point of the face's lines, one texel each. */
+const faceTexture = (() => {
+  const width = 128;
+  const data = new Float32Array(width * 4);
+  FACE_POINTS.forEach((p, i) => data.set([p[0], p[1], p[2], 1], i * 4));
+  const t = new THREE.DataTexture(data, width, 1, THREE.RGBAFormat, THREE.FloatType);
+  t.needsUpdate = true;
+  return t;
+})();
 
 /** The statue's lighting and carving, shared by every program the marble compiles into. */
 const MARBLE_UNIFORMS = {
@@ -222,6 +278,7 @@ const MARBLE_UNIFORMS = {
   uMouth: { value: FACE.mouth },
   uChin: { value: FACE.chin },
   uDust: { value: new THREE.Color("#6b5d4a") },
+  uFace: { value: faceTexture },
   uShowShadow: { value: 0 },
   /*
     How much of the room's general light (its ambient, sky and floor
@@ -230,16 +287,18 @@ const MARBLE_UNIFORMS = {
     statue's own fill does that job instead, in a cool tone, at about a
     quarter of the key.
   */
-  uIndirect: { value: 0.28 },
+  uIndirect: { value: 0.14 },
   // the key on the stone, a little stronger than on the plinth and floor, so the face carries the light
-  uKeyGain: { value: 1.6 },
+  uKeyGain: { value: 1.7 },
   /*
     The hall's other lamps - the alcove's side lights, the nearest door's -
     reach the face too, from directions the key's shadow knows nothing
     about, and lit every shadow on it back up. The statue takes only a
     part of them; its key and its rim are its own.
   */
-  uOther: { value: 0.08 },
+  uOther: { value: 0.04 },
+  // the statue as a whole, brighter or darker, lit and shadowed sides together so its shading keeps
+  uExposure: { value: 1.55 },
   ...selfShadow,
 };
 if (typeof window !== "undefined" && hasDebugFlag()) (window as unknown as { __marble?: typeof MARBLE_UNIFORMS }).__marble = MARBLE_UNIFORMS;
@@ -324,6 +383,71 @@ void main() {`)
 	carve += ( vec3( mHash( pitAt ), mHash( pitAt + 7.7 ), mHash( pitAt + 3.3 ) ) - 0.5 ) * 0.22 * stubble * step( 0.55, mHash( pitAt + 1.9 ) );
 	carve += ( grain * 0.6 ) * chip;
 	carve += eyeCut;
+	/*
+	  The face, carved along its landmarks:
+	    the line between the lips, deep and shadowed; the lips' edge a fine ridge;
+	    the lid's edge and the crease above it; the line under the eye;
+	    the folds from the nose past the mouth; the philtrum's two ridges;
+	    the dimples; the nostrils, drilled and dark;
+	    the brows a raised band of hair; the moustache and chin beard in strokes.
+	*/
+	float faceShade = 1.0;
+	if ( vHead > 0.5 && distance( lp, uMouth ) < 0.09 ) {
+		vec3 nL = normalize( ( vec4( normal, 0.0 ) * viewMatrix ).xyz );
+		carveLine( lp, nL, F_MOUTH, 0.00055, 0.00055, 0.45, carve, faceShade );
+		carveLine( lp, nL, F_LIPUP, - 0.00018, 0.00045, 0.0, carve, faceShade );
+		carveLine( lp, nL, F_LIPLO, - 0.00012, 0.0005, 0.0, carve, faceShade );
+		// one soft line for each upper lid and a fainter one under the eye: more, this close together, read as scribble
+		carveLine( lp, nL, F_LIDR, 0.00016, 0.0007, 0.22, carve, faceShade );
+		carveLine( lp, nL, F_LIDL, 0.00016, 0.0007, 0.22, carve, faceShade );
+		carveLine( lp, nL, F_LIDRLO, 0.00006, 0.0008, 0.08, carve, faceShade );
+		carveLine( lp, nL, F_LIDLLO, 0.00006, 0.0008, 0.08, carve, faceShade );
+		carveLine( lp, nL, F_NASOR, 0.0006, 0.0017, 0.14, carve, faceShade );
+		carveLine( lp, nL, F_NASOL, 0.0006, 0.0017, 0.14, carve, faceShade );
+		carveLine( lp, nL, F_PHILR, - 0.00025, 0.0009, 0.0, carve, faceShade );
+		carveLine( lp, nL, F_PHILL, - 0.00025, 0.0009, 0.0, carve, faceShade );
+		// dimples and nostrils are points: shallow pits, the nostrils drilled deeper and dark
+		vec3 away;
+		for ( int k = 0; k < 2; k ++ ) {
+			vec3 dp = facePt( ${FACE_LINES.dimples.at} + k );
+			float dd = length( lp - dp );
+			float ed = exp( - dd * dd / ( 0.0016 * 0.0016 ) );
+			vec3 out1 = ( lp - dp ) / max( dd, 1e-6 );
+			carve -= ( out1 - dot( out1, nL ) * nL ) * ( 2.0 * 0.0005 / 0.0016 ) * ( dd / 0.0016 ) * ed;
+			faceShade *= 1.0 - 0.16 * ed;
+			vec3 np_ = facePt( ${FACE_LINES.nostrils.at} + k );
+			float dn = length( lp - np_ );
+			float en = exp( - dn * dn / ( 0.0019 * 0.0019 ) );
+			vec3 out2 = ( lp - np_ ) / max( dn, 1e-6 );
+			carve -= ( out2 - dot( out2, nL ) * nL ) * ( 2.0 * 0.0008 / 0.0019 ) * ( dn / 0.0019 ) * en;
+			faceShade *= 1.0 - 0.45 * en;
+		}
+		// the brows: a raised band, its edge soft, and hair in fine strokes along it
+		float browR = faceLine( lp, F_BROWR, away );
+		float browL = faceLine( lp, F_BROWL, away );
+		float browHalfR = facePt( ${FACE_LINES.browWR.at} ).x;
+		float browHalfL = facePt( ${FACE_LINES.browWL.at} ).x;
+		float brow = max( 1.0 - smoothstep( browHalfR * 0.75, browHalfR * 1.25, browR ), 1.0 - smoothstep( browHalfL * 0.75, browHalfL * 1.25, browL ) );
+		carveLine( lp, nL, F_BROWR, - 0.00045, browHalfR, 0.0, carve, faceShade );
+		carveLine( lp, nL, F_BROWL, - 0.00045, browHalfL, 0.0, carve, faceShade );
+		vec3 hairAt = vec3( lp.x * 650.0, lp.y * 2600.0 + lp.x * 300.0 * sign( lp.x - uMouth.x ), lp.z * 2600.0 );
+		carve += vec3( 0.0, mNoise( hairAt ) - 0.5, mNoise( hairAt + 5.3 ) - 0.5 ) * 0.5 * brow;
+		// carved hair holds a little more shadow than smooth stone
+		faceShade *= 1.0 - 0.14 * brow;
+		// the moustache: between the nose and the upper lip, in short strokes falling outward
+		float dLip = faceLine( lp, F_LIPUP, away );
+		float dNose = faceLine( lp, F_NOSEBASE, away );
+		float above = dot( lp - uMouth, vec3( 0.0, 0.959, 0.283 ) );
+		float stache = ( 1.0 - smoothstep( 0.004, 0.007, dLip ) ) * ( 1.0 - smoothstep( 0.006, 0.011, dNose ) ) * smoothstep( 0.001, 0.003, above );
+		vec3 stacheAt = vec3( lp.x * 2400.0, lp.y * 520.0 + abs( lp.x - uMouth.x ) * 900.0, lp.z * 2400.0 );
+		carve += vec3( mNoise( stacheAt ) - 0.5, 0.0, mNoise( stacheAt + 2.7 ) - 0.5 ) * 0.4 * stache;
+		faceShade *= 1.0 - 0.08 * stache;
+		// the chin beard, thicker in the middle of the chin than along the jaw
+		float goatee = stubble * ( 1.0 - smoothstep( 0.006, 0.016, abs( lp.x - uMouth.x ) ) );
+		carve += ( grain * 1.2 ) * goatee;
+		faceShade *= 1.0 - 0.06 * goatee;
+	}
+	diffuseColor.rgb *= faceShade;
 	normal = normalize( normal + ( viewMatrix * vec4( carve, 0.0 ) ).xyz );`,
     )
     .replace(
@@ -357,6 +481,7 @@ ${lights}`,
 		float nl = dot( nW, normalize( uKeyWorld - vMarbleWorld ) );
 		float wrapBand = clamp( ( nl + 0.25 ) / 1.25, 0.0, 1.0 ) - clamp( nl, 0.0, 1.0 ) + ( 1.0 - marbleKeyLit ) * clamp( nl, 0.0, 1.0 ) * 0.25;
 		outgoingLight += uKeyTint * uWrap * wrapBand * diffuseColor.rgb;
+		outgoingLight *= uExposure;
 		// a soft shoulder under the ceiling, so the brightest glint rolls off instead of clipping to white
 		float peak = max( max( outgoingLight.r, outgoingLight.g ), outgoingLight.b );
 		float knee = uCeil * 0.6;
