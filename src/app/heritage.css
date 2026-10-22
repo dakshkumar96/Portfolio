@@ -572,6 +572,24 @@
   outline-offset: 3px;
 }
 
+/* under a finger the way back is a real button, a full finger high, not a line of small type */
+@media (hover: none) and (pointer: coarse) {
+  .museum-back {
+    min-height: 44px;
+    margin-top: 6px;
+    padding: 0 16px;
+    font-size: 12px;
+    opacity: 1;
+    color: #dcc08a;
+    background: rgba(12, 8, 5, 0.78);
+    border: 1px solid rgba(200, 148, 74, 0.4);
+    -webkit-tap-highlight-color: transparent;
+  }
+  .museum-back:active {
+    background: rgba(44, 29, 17, 0.95);
+  }
+}
+
 /*
   The hint: how to move, then what to click. It was set at the size of
   the corner labels, which made it one more thing to squint at, and a
@@ -645,7 +663,74 @@
   }
 }
 
+/*
+  The button that takes you through the door you are walking up to. Only
+  where the doors themselves are hard to reach: on touch screens, and on
+  any window narrow enough that the side walls are out of view. It sits
+  just above the hint, in the same dark plate, and is a full finger high.
+*/
+.museum-door-cta {
+  display: none;
+}
+
+@media (hover: none) and (pointer: coarse), (max-width: 760px) {
+  .museum-door-cta {
+    position: fixed;
+    left: 50%;
+    bottom: 124px;
+    z-index: 5;
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    min-height: 48px;
+    padding: 12px 22px;
+    border: 1px solid rgba(220, 192, 138, 0.55);
+    border-radius: 2px;
+    background: rgba(20, 13, 8, 0.9);
+    box-shadow:
+      0 0 0 3px rgba(12, 8, 5, 0.6),
+      0 8px 22px rgba(0, 0, 0, 0.5),
+      0 0 18px rgba(200, 148, 74, 0.18);
+    color: #f1e2bf;
+    font-family: var(--font-plex-mono), ui-monospace, "SFMono-Regular", Menlo, monospace;
+    font-size: 13px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    white-space: nowrap;
+    cursor: pointer;
+    transform: translateX(-50%);
+    animation: door-cta-in 0.35s ease both;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .museum-door-cta svg {
+    width: 12px;
+    height: 12px;
+    color: #dcc08a;
+  }
+  .museum-door-cta:active {
+    background: rgba(44, 29, 17, 0.95);
+  }
+  .museum-door-cta.hidden {
+    display: none;
+  }
+}
+
+@keyframes door-cta-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 8px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}
+
 @media (max-width: 560px) {
+  /* above the hint, which is itself above the sound switch */
+  .museum-door-cta {
+    bottom: 158px;
+  }
   /* above the sound switch in the corner */
   .museum-tip {
     bottom: 62px;
@@ -675,6 +760,9 @@
     animation: none;
   }
   .museum-tip-main::before {
+    animation: none;
+  }
+  .museum-door-cta {
     animation: none;
   }
   .museum-placards .tool-box,

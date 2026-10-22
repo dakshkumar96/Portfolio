@@ -222,7 +222,17 @@ a {
   z-index: 0;
 }
 
+/*
+  In the hall a finger swipe up or down is the walk: the page scrolls under
+  it, natively, with the phone's own momentum, and the walk follows the
+  scroll. Sideways drags are still the look. In a room the page is held
+  still, and a drag in any direction looks around.
+*/
 .museum-canvas-fixed canvas {
+  touch-action: pan-y;
+}
+
+.museum-root.in-room .museum-canvas-fixed canvas {
   touch-action: none;
 }
 

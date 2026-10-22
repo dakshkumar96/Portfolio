@@ -6,7 +6,7 @@ import dynamic from "next/dynamic";
 import * as THREE from "three";
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
-import { doors, type RoomId } from "./corridorLayout";
+import { CAM_Z_END, CAM_Z_START, doors, type DoorSpec, type RoomId } from "./corridorLayout";
 import { allExhibits, type ExhibitDatum } from "./exhibitData";
 import { hasWebGL } from "./webgl";
 import { markDoorClick } from "./clickTrace";
@@ -352,6 +352,30 @@ export function MuseumWorld() {
 
   const roomLabel = doors.find((d) => d.id === room)?.label ?? "";
 
+  /*
+    The door you are walking up to, for the button that takes you in.
+
+    On a phone held upright the hall is seen down its length through a
+    narrow screen, so the doors on its side walls have slid out of view by
+    the time you reach them, and there is nothing left to tap. Walking up to
+    one brings up a button that goes in through it. Read from the scroll a
+    few times a second, which is all a walk needs.
+  */
+  const [nearDoor, setNearDoor] = useState<DoorSpec | null>(null);
+  useEffect(() => {
+    // in a room it is not shown (see the button below), and the hall's position is not read
+    if (room) return;
+    const check = () => {
+      const t = Math.min(1, Math.max(0, progressRef.current));
+      const z = CAM_Z_START + (CAM_Z_END - CAM_Z_START) * t;
+      // from eleven metres short of a door until just past it
+      const next = doors.find((d) => z - d.z < 11 && z - d.z > -2.5) ?? null;
+      setNearDoor((prev) => (prev?.id === next?.id ? prev : next));
+    };
+    const id = window.setInterval(check, 200);
+    return () => window.clearInterval(id);
+  }, [room]);
+
   return (
     <>
       {/*
@@ -384,7 +408,7 @@ export function MuseumWorld() {
         </div>
       ) : null}
 
-      <div ref={rootRef} className={`museum-root${ready ? " ready" : ""}`}>
+      <div ref={rootRef} className={`museum-root${ready ? " ready" : ""}${room ? " in-room" : ""}`}>
         <HeritageDefs />
 
         <div className={`museum-canvas-fixed${lit ? " is-lit" : ""}`}>
@@ -444,6 +468,19 @@ export function MuseumWorld() {
           doors. A phone has no wheel and a room has no swipe to walk, so
           a touch screen is told what it can actually do there.
         */}
+        {nearDoor && !room ? (
+          <button
+            type="button"
+            key={nearDoor.id}
+            className={`museum-door-cta${active ? " hidden" : ""}`}
+            onClick={() => enterRoom(nearDoor.id)}
+          >
+            <span>Enter {nearDoor.label}</span>
+            <svg viewBox="0 0 12 12" aria-hidden="true" focusable="false">
+              <path d="M4 2.5L7.5 6L4 9.5" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </button>
+        ) : null}
         <p className={`museum-tip${active ? " hidden" : ""}`}>
           <span className="museum-tip-main">
             <span className="tip-mouse">{room ? "Scroll to walk through the room" : "Scroll to walk down the hall"}</span>
