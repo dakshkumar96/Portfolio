@@ -38,8 +38,8 @@ function beamGeometry(length: number, radius: number, peak: number) {
     const u = p.getZ(i) / length; // 0 at the lamp, 1 at the far end
     const b = peak * Math.pow(1 - u, 1.4) * Math.min(1, u * 8);
     colour[i * 3] = b;
-    colour[i * 3 + 1] = b * 0.82;
-    colour[i * 3 + 2] = b * 0.55;
+    colour[i * 3 + 1] = b * 0.8;
+    colour[i * 3 + 2] = b * 0.45;
   }
   g.setAttribute("color", new THREE.BufferAttribute(colour, 3));
   return g;

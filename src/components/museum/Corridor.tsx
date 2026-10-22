@@ -456,7 +456,8 @@ function StatueLight() {
         angle={0.32}
         penumbra={0.95}
         distance={26}
-        color={GOLD.light}
+        /* a shade more yellow than the rooms' lamps, like an old tungsten spot over the one great piece */
+        color="#ffcc78"
         pin
       />
       {/* a gold rim from behind, about a third of the key, so his outline lifts off the niche */}
