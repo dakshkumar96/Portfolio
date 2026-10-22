@@ -516,7 +516,7 @@ export const hackathonExhibit: ExhibitDatum = {
   title: "Hackathons and London",
   meta: "Photograph. Where he goes to learn",
   body:
-    "Most weekends he is at a hackathon or tech event in London, building late and meeting people who are further along than he is. He goes to be the least experienced person in the room and learn from everyone there. It is a big part of why he loves living in London.",
+    "He lives in Egham, but whenever he is free and spots an event worth going to, he heads into London for a hackathon or tech meetup. He loves meeting new people who think better than he does, and he always comes back having learned something from them.",
 };
 
 export const societyExhibit: ExhibitDatum = {
