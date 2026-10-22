@@ -6,7 +6,9 @@ import {
   Vignette,
   HueSaturation,
   BrightnessContrast,
+  Noise,
 } from "@react-three/postprocessing";
+import { BlendFunction } from "postprocessing";
 
 /**
  * Grade is done with Hue/Saturation + Brightness/Contrast rather than a
@@ -21,11 +23,14 @@ import {
 export function Effects() {
   return (
     <EffectComposer multisampling={4}>
-      <Bloom luminanceThreshold={0.9} luminanceSmoothing={0.2} intensity={0.25} mipmapBlur />
+      {/* only the fixtures and glints bloom: the statue is kept under the threshold and never clips */}
+      <Bloom luminanceThreshold={0.9} luminanceSmoothing={0.2} intensity={0.2} mipmapBlur />
       <Vignette eskil={false} offset={0.32} darkness={0.5} />
       {/* the Art wall's posters are printed to cancel these two (exactPrint in photoGrade): keep them in step */}
       <HueSaturation hue={0.0} saturation={-0.14} />
       <BrightnessContrast brightness={0.01} contrast={0.12} />
+      {/* a fine film grain, three percent, so dark stone is never a flat digital fill */}
+      <Noise premultiply blendFunction={BlendFunction.SOFT_LIGHT} opacity={0.03} />
     </EffectComposer>
   );
 }

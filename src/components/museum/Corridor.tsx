@@ -11,23 +11,25 @@ import {
   blackBrickFor,
   brushedMetalFor,
   getContactShadow,
+  getLightPool,
 } from "./textures";
 import { getAjrakRelief, getBossEngraving, getBronze, getStarLattice } from "./doorTextures";
 import { DoorCrown } from "./DoorCrown";
 import { ease, merged, shade, worldUV } from "./architecture";
 import { WallInscriptions } from "./WallContent";
-import { HungPicture, PHOTO_FILES } from "./PortraitWall";
+import { HungPicture } from "./PortraitWall";
 import { usePulse } from "./breath";
 import type { PhotoCrop } from "./photoGrade";
 import { Vault, StoneMaterial } from "./Vault";
 import { EndWall } from "./EndWall";
 import { Atmosphere } from "./Atmosphere";
 import { Statue, PLINTH_H as STATUE_PLINTH_H } from "./Statue";
+import { STATUE_KEY, STATUE_Z, receiveStatueShadow } from "./statueShadow";
 import { RoomShell } from "./RoomShell";
 import { SPOT_COUNT, spotPlan } from "./roomLayout";
 import { CaseContents } from "./CaseModels";
 import { ExhibitText } from "./ExhibitText";
-import { aboutExhibits, caseExhibits, childhoodExhibit, hackathonExhibit, hallExhibits, societyExhibit, type ExhibitDatum } from "./exhibitData";
+import { caseExhibits, childhoodExhibit, hackathonExhibit, hallExhibits, societyExhibit, type ExhibitDatum } from "./exhibitData";
 import { consumedDrag } from "./lookControls";
 import { SHELL, MID, GOLD, LEVEL, EMIT } from "./palette";
 import {
@@ -286,6 +288,10 @@ function BrickMaterial({ rx, ry }: { rx: number; ry: number }) {
   const pbr = useMemo(() => blackBrickFor(rx, ry), [rx, ry]);
   return (
     <meshStandardMaterial
+      /* the statue's shadow falls across the floor in front of the plinth */
+      ref={(m: THREE.MeshStandardMaterial | null) => {
+        if (m) receiveStatueShadow(m, 0.5);
+      }}
       color={SHELL.ground}
       map={pbr?.map ?? null}
       normalMap={pbr?.normalMap ?? null}
@@ -402,21 +408,20 @@ function PoolLight({
  * one bright thing at the far end of the hall - the destination the walk
  * is facing.
  */
-const STATUE_Z = Z_FAR + 4.2;
 
 function FarFocusInner() {
-  const halo = useMemo(() => getContactShadow(), []);
+  const halo = useMemo(() => getLightPool(), []);
   return (
     <group>
       <EndWall />
       {/* a pool of warm light on the floor round the plinth */}
       <mesh position={[0, 0.02, STATUE_Z]} rotation={[-Math.PI / 2, 0, 0]}>
-        <planeGeometry args={[7, 7]} />
+        <planeGeometry args={[7.5, 7.5]} />
         <meshBasicMaterial
           color={GOLD.light}
           map={halo ?? undefined}
           transparent
-          opacity={0.18}
+          opacity={0.13}
           blending={THREE.AdditiveBlending}
           depthWrite={false}
           toneMapped={false}
@@ -432,24 +437,32 @@ function FarFocusInner() {
  * The light over the statue, mounted with the other lights on the first
  * frame so the scene's light count is settled before anything is drawn.
  */
+/*
+  The statue's key light (STATUE_KEY, in statueShadow) hangs high and off
+  to his right, not straight in front. Lit from dead ahead, every fold of
+  the clothes faced the light and showed nothing; from the side and
+  above, the way a sculpture is lit in a gallery, each fold and edge
+  throws its own shadow and the carving reads.
+*/
+
 function StatueLight() {
   return (
     <>
       <PoolLight
-        position={[0, WALL_H - 0.6, STATUE_Z + 8.5]}
+        position={STATUE_KEY}
         target={[0, STATUE_PLINTH_H + 1.9, STATUE_Z]}
-        intensity={764}
+        intensity={450}
         angle={0.3}
         penumbra={0.9}
         distance={26}
         color="#ffd9a0"
         pin
       />
-      {/* a faint gold rim from behind, so his outline lifts off the niche */}
+      {/* a gold rim from behind, about a third of the key, so his outline lifts off the niche */}
       <PoolLight
         position={[0, STATUE_PLINTH_H + 4.2, Z_FAR + 0.9]}
         target={[0, STATUE_PLINTH_H + 1.7, STATUE_Z + 1.5]}
-        intensity={110}
+        intensity={240}
         angle={0.55}
         penumbra={0.9}
         distance={10}
@@ -889,8 +902,6 @@ const WHOLE_PRINT: PhotoCrop = { focus: [0.5, 0.5], zoom: 1, whole: true };
 const HALL_PICTURES: { z: number; side: 1 | -1; src: string; exhibit: ExhibitDatum }[] = [
   { z: -16, side: 1, src: "/museum/corridor-flight.jpg", exhibit: hallExhibits[0] },
   { z: -34, side: -1, src: "/museum/childhood.jpg", exhibit: childhoodExhibit },
-  { z: -52, side: 1, src: PHOTO_FILES[1].src, exhibit: aboutExhibits[1] },
-  { z: -70, side: -1, src: PHOTO_FILES[2].src, exhibit: aboutExhibits[2] },
   { z: -88, side: 1, src: "/museum/hackathon.jpg", exhibit: hackathonExhibit },
   { z: -106, side: -1, src: "/museum/society.jpg", exhibit: societyExhibit },
 ];
@@ -1031,7 +1042,7 @@ function DoorInner({
   const tex = useMemo(() => getLeafTextures(), []);
   const relief = useMemo(() => getAjrakRelief(), []);
   const engraving = useMemo(() => getBossEngraving(), []);
-  const pool = useMemo(() => getContactShadow(), []);
+  const pool = useMemo(() => getLightPool(), []);
 
   useEffect(() => {
     if (!hovered) return;
@@ -1483,28 +1494,31 @@ function DoorInner({
       ))}
 
       {/*
-        The pool of light on the floor, with a real falloff: masked with a
-        radial gradient so it reads as light, not as a sheet on the floor.
+        The light from the parting, spilled on the floor: a wide, faint,
+        warm pool that fades out the whole way, and a soft brighter middle
+        under the crack. It used to be a near-white streak at nearly full
+        strength over a pool with a hard rim - a stage light, not a lamp
+        behind a door - so both are a third as strong, warm yellow, larger
+        and with no edge.
       */}
-      <mesh position={[0, 0.15, 1.3]} rotation={[-Math.PI / 2, 0, 0]}>
-        <planeGeometry args={[2.8, 4.0]} />
+      <mesh position={[0, 0.15, 1.4]} rotation={[-Math.PI / 2, 0, 0]}>
+        <planeGeometry args={[3.4, 4.6]} />
         <meshBasicMaterial
-          color={GOLD.halo}
+          color="#f2bf6e"
           map={pool ?? undefined}
           transparent
-          opacity={(lit ? 0.4 : 0.26) * fall}
+          opacity={(lit ? 0.24 : 0.15) * fall}
           depthWrite={false}
           blending={THREE.AdditiveBlending}
         />
       </mesh>
-      {/* the narrow bright core of it, directly under the parting */}
-      <mesh position={[0, 0.16, 0.75]} rotation={[-Math.PI / 2, 0, 0]}>
-        <planeGeometry args={[0.55, 1.9]} />
+      <mesh position={[0, 0.16, 0.85]} rotation={[-Math.PI / 2, 0, 0]}>
+        <planeGeometry args={[1.1, 2.6]} />
         <meshBasicMaterial
-          color={GOLD.core}
+          color="#ffd583"
           map={pool ?? undefined}
           transparent
-          opacity={(lit ? 0.85 : 0.5) * fall}
+          opacity={(lit ? 0.26 : 0.13) * fall}
           depthWrite={false}
           blending={THREE.AdditiveBlending}
         />
@@ -1624,11 +1638,11 @@ function DoorLights({ activeRoom }: { activeRoom: RoomId | null }) {
             <PoolLight
               position={[0, H * 1.25, 5.2]}
               target={[0, H * 0.4, 0]}
-              intensity={activeRoom === door.id ? 150 : 88}
+              intensity={activeRoom === door.id ? 135 : 80}
               angle={0.5}
               distance={9}
-              /* near-neutral, warm of white, so walnut reads as walnut and sandstone as stone */
-              color="#fff0dc"
+              /* warm of white, the colour of a lamp, so walnut reads as walnut and sandstone as stone */
+              color="#ffe6c2"
             />
           </group>
         );
@@ -1786,7 +1800,7 @@ export function Corridor({
       <RoomLights door={lit} />
       <DoorLights activeRoom={activeRoom} />
       <StatueLight />
-      <Atmosphere lamp={[0, WALL_H - 0.6, STATUE_Z + 8.5]} target={[0, STATUE_PLINTH_H + 1.9, STATUE_Z]} />
+      <Atmosphere lamp={STATUE_KEY} target={[0, STATUE_PLINTH_H + 1.9, STATUE_Z]} />
       {/*
         Every chamber is built, always.
 

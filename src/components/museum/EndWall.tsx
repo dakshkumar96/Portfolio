@@ -7,6 +7,7 @@ import { GOLD, SHELL } from "./palette";
 import { block, ease, frame, merged, pilaster, placed, shade, sweptProfile, worldUV } from "./architecture";
 import { ASHLAR_TILE, getAshlar, getStoneGrain } from "./stoneTextures";
 import { CORNICE_BOTTOM, SECTION, StoneMaterial, corniceProfile } from "./Vault";
+import { receiveStatueShadow } from "./statueShadow";
 
 /**
  * The wall that closes the hall, behind the statue.
@@ -19,9 +20,11 @@ import { CORNICE_BOTTOM, SECTION, StoneMaterial, corniceProfile } from "./Vault"
  *
  * At its centre is a niche: a half-round recess with a half-dome over it,
  * as a statue gallery would have, framed in a stepped architrave with a
- * keystone. A warm light hidden at its foot washes up the curve, so the
- * statue stands against a lit hollow and its outline reads from the far
- * end of the hall. A single hairline of light runs round the arch - the
+ * keystone. The hollow is lit from above, faintly: brightest at the height
+ * of the statue's head and falling to near black at its floor, and kept
+ * well over three stops darker than the figure, so the marble is the
+ * brightest thing at the end of the walk and nothing glows up from
+ * behind his feet. A single hairline of light runs round the arch - the
  * one modern hand in it.
  */
 
@@ -89,8 +92,10 @@ function useNiche() {
 }
 
 /**
- * The light hidden at the niche's foot, painted up its curve: bright at
- * the sill, falling away as it climbs, faint in the half-dome.
+ * The light in the niche, painted up its curve: a soft band brightest at
+ * the statue's head (about two fifths of the way up the hollow), near black
+ * at the sill, fading slowly into the half-dome - light falling from
+ * above, not rising from the floor.
  */
 function useNicheGlow() {
   const tex = useMemo(() => {
@@ -103,7 +108,9 @@ function useNicheGlow() {
     for (let y = 0; y < H; y += 1) {
       // the canvas's top row is the top of the half-dome
       const v = 1 - y / (H - 1);
-      const b = 0.07 + 0.93 * Math.exp(-v / 0.34);
+      const head = 0.42;
+      const k = (v - head) / (v < head ? 0.22 : 0.36);
+      const b = 0.02 + 0.98 * Math.exp(-k * k);
       ctx.fillStyle = `rgb(${Math.round(255 * b)},${Math.round(255 * b)},${Math.round(255 * b)})`;
       ctx.fillRect(0, y, 1, 1);
     }
@@ -232,6 +239,9 @@ export function EndWall() {
           emissive={DARK}
           emissiveMap={ashlar?.map ?? null}
           emissiveIntensity={0.14}
+          ref={(m: THREE.MeshStandardMaterial | null) => {
+            if (m) receiveStatueShadow(m, 0.45);
+          }}
         />
       </mesh>
 
@@ -246,12 +256,22 @@ export function EndWall() {
           envMapIntensity={0.3}
           emissive="#b98545"
           emissiveMap={glow}
-          emissiveIntensity={0.42}
+          emissiveIntensity={0.15}
+          ref={(m: THREE.MeshStandardMaterial | null) => {
+            if (m) receiveStatueShadow(m, 0.45);
+          }}
         />
       </mesh>
       <mesh position={[0, NICHE_SILL + 0.001, Z_FAR + 0.02]} rotation={[-Math.PI / 2, 0, 0]}>
         <circleGeometry args={[NICHE_R, 40, 0, Math.PI]} />
-        <meshStandardMaterial color={SHELL.recess} roughness={0.7} metalness={0.2} emissive="#b98545" emissiveIntensity={0.12} />
+        <meshStandardMaterial
+          color={SHELL.recess}
+          roughness={0.7}
+          metalness={0.2}
+          ref={(m: THREE.MeshStandardMaterial | null) => {
+            if (m) receiveStatueShadow(m, 0.4);
+          }}
+        />
       </mesh>
 
       <mesh geometry={stonework}>

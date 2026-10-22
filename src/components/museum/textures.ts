@@ -728,6 +728,38 @@ export function getContactShadow(): THREE.Texture | null {
 }
 
 
+let poolCache: THREE.Texture | null = null;
+
+/**
+ * Lamplight spilled on a floor: brightest at its middle and fading the
+ * whole way out, with no flat bright centre and no edge. The contact
+ * shadow's mask holds full strength over its middle, which is right for
+ * a shadow under a case but drew a hard bright ellipse when used for
+ * light.
+ */
+export function getLightPool(): THREE.Texture | null {
+  if (poolCache) return poolCache;
+  const S = 256;
+  const canvas = document.createElement("canvas");
+  canvas.width = canvas.height = S;
+  const c = canvas.getContext("2d", { willReadFrequently: true });
+  if (!c) return null;
+  const g = c.createRadialGradient(S / 2, S / 2, 0, S / 2, S / 2, S / 2);
+  // close to a gaussian: it falls away from the very middle and is gone well before the edge
+  g.addColorStop(0, "rgba(255,255,255,1)");
+  g.addColorStop(0.2, "rgba(255,255,255,0.78)");
+  g.addColorStop(0.42, "rgba(255,255,255,0.42)");
+  g.addColorStop(0.64, "rgba(255,255,255,0.16)");
+  g.addColorStop(0.84, "rgba(255,255,255,0.04)");
+  g.addColorStop(1, "rgba(255,255,255,0)");
+  c.fillStyle = g;
+  c.fillRect(0, 0, S, S);
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.NoColorSpace;
+  poolCache = tex;
+  return tex;
+}
+
 let plasterCache: { map: THREE.Texture; normalMap: THREE.Texture; roughnessMap: THREE.Texture } | null = null;
 
 /**
