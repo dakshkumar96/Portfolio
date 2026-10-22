@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import * as THREE from "three";
@@ -71,7 +71,17 @@ function CardContents({ exhibit, index, onClose }: { exhibit: ExhibitDatum; inde
       */}
       <CatalogueStamp numeral={toRoman(index + 1)} />
       <h2>{exhibit.title}</h2>
-      {exhibit.meta ? <p className="museum-placard-meta">{exhibit.meta}</p> : null}
+      {exhibit.meta ? (
+        <p className="museum-placard-meta">
+          {/* each part stays whole, so a wrap falls after a dot and never starts a line with one */}
+          {exhibit.meta.split(" · ").map((part, i, all) => (
+            <Fragment key={i}>
+              <span className="meta-part">{i < all.length - 1 ? `${part} ·` : part}</span>
+              {i < all.length - 1 ? " " : null}
+            </Fragment>
+          ))}
+        </p>
+      ) : null}
       <div className="cat-rule" aria-hidden="true" />
       {exhibit.body ? (
         <p className={`museum-placard-copy${exhibit.body.length < 90 ? " is-short" : ""}`}>

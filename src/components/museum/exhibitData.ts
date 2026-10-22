@@ -135,49 +135,49 @@ const role = (
 
 export const experienceExhibits: ExhibitDatum[] = [
   // across the back
-  role("president", "President", "International Society, Royal Holloway", "Part time · May 2026 to present", [
+  role("president", "President", "International Society, Royal Holloway", "International Society, Royal Holloway · Part time · May 2026 to present", [
     "Launched a digital membership system with Apple Wallet cards, giving members discounts at local stores and guaranteed interviews with partner job agencies.",
     "Run the society like a startup, with events nobody on campus had done before, including the Night of Nations, a Cultural Fashion Show and a go karting Rush Rally, many run with the International Community and other cultural societies.",
     "Lead a committee of 10 and coordinate the society's day to day running.",
   ]),
-  role("nextround", "Founding Product Engineer", "NextRound", "Part time · Oct 2026 to present · Hybrid", [
+  role("nextround", "Founding Product Engineer", "NextRound", "NextRound · Part time · Oct 2026 to present", [
     "Joined as one of the first engineers at an early stage startup building evidence based hiring, which helps companies judge candidates on what they can actually do. I work directly with the CEO on the core product.",
     "Improving the NextRound portal and the candidate assessment experience, using feedback from early users to decide what to fix and build first.",
     "Run the platform locally to test changes properly before anything goes live.",
     "Help shape the product roadmap and think through how the platform should grow as we take on more clients.",
   ]),
-  role("research", "Research Assistant", "Royal Holloway", "Internship · May 2026 to Aug 2026 · Remote", [
+  role("research", "Research Assistant", "Royal Holloway", "Royal Holloway · Internship · May 2026 to Aug 2026", [
     "Co-authored research applying conformal prediction to estimating exoplanet orbits from radial velocity data. It reached 100% coverage against a 90% target on 34 held out real stars, with no empty intervals.",
     "Designed and built the synthetic data pipeline, simulating planet signals from Kepler's equations and adding real noise taken from NASA telescope observations.",
     "Implemented likelihood ratio reweighting (Tibshirani et al., 2019) so intervals calibrated only on synthetic data still hold on real, unseen observations.",
   ]),
   // the left wall
-  role("host", "Host", "Insanity Radio 103.2FM", "Part time · Oct 2026 to present · Egham, on site", [
+  role("host", "Host", "Insanity Radio 103.2FM", "Insanity Radio 103.2FM · Part time · Oct 2026 to present", [
     "Host Artificial Insanity, a live weekly show on Insanity Radio 103.2FM, Royal Holloway's student and community station. It goes out every Monday from 11am to 12pm.",
     "The show is for people who think AI has nothing to do with them. It looks at how AI already shapes everyday life, from bills, jobs and water to education and even the way we think, in plain English with no tech background needed.",
     "Invite Royal Holloway academics and people working in industry as guests to share their perspective on where AI is heading.",
     "Some episodes also cover careers, student life and the everyday challenges international students face.",
     "Came in with no radio experience and took this on to push myself, get better at speaking live, and have honest conversations with interesting people.",
   ]),
-  role("marketing", "Marketing Coordinator", "Palmy", "Internship · Aug 2025 to Oct 2025 · Hybrid", [
+  role("marketing", "Marketing Coordinator", "Palmy", "Palmy · Internship · Aug 2025 to Oct 2025", [
     "Edited full podcast episodes in Premiere Pro and made trailers and short clips for YouTube, Instagram and TikTok.",
     "Set up SEO across platforms, including titles, descriptions, tags and thumbnails, so the content was easier to find.",
     "Designed branding and thumbnail visuals in Photoshop, building a consistent look across all distributed content.",
   ]),
-  role("video", "Video Editor", "Freelance", "Freelance · from the age of fifteen", [
+  role("video", "Video Editor", "Freelance", "Freelance · From age fifteen", [
     "Began editing at thirteen and was freelancing by fifteen.",
   ]),
   // the right wall
-  role("ambassador", "Student Ambassador", "Royal Holloway", "Part time · Sep 2026 to present · Egham, on site", [
+  role("ambassador", "Student Ambassador", "Royal Holloway", "Royal Holloway · Part time · Sep 2026 to present", [
     "Talk with prospective students and their families at open days and campus tours.",
     "Meet a wide range of visitors, from sixth form students to parents and teachers, and adapt how I present the university to each of them.",
   ]),
-  role("hall-life", "Hall Life Assistant", "Royal Holloway", "Part time · Sep 2026 to present · Egham, on site", [
+  role("hall-life", "Hall Life Assistant", "Royal Holloway", "Royal Holloway · Part time · Sep 2026 to present", [
     "Support residents across halls of residence, running kitchen meetings and flat meetings to check in on wellbeing and catch problems early.",
     "Mediate between flatmates and help sort out everyday problems before they grow.",
     "Handle critical incidents and point residents to the right university support, whether that is wellbeing, welfare or something else.",
   ]),
-  role("bar", "Bar Associate", "J D Wetherspoon", "Part time · Feb 2026 to present · Windsor, on site", [
+  role("bar", "Bar Associate", "J D Wetherspoon", "J D Wetherspoon · Part time · Feb 2026 to present", [
     "Work bar and floor service at a large three floor pub in Windsor with a team of around 80.",
     "Handle customer complaints and resolve issues directly, staying calm and solving problems under pressure.",
   ]),

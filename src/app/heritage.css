@@ -174,6 +174,11 @@
   letter-spacing: 0;
   text-transform: none;
   color: #cfa96d;
+  /* a long company name wraps into two even lines, never one word left on its own */
+  text-wrap: balance;
+}
+.museum-placard-meta .meta-part {
+  white-space: nowrap;
 }
 
 /* a flourish that a nib would leave, thick in the middle, a hook at each end */
