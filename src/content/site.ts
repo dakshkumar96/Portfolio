@@ -2,28 +2,28 @@ export const site = {
   name: "Daksh Kumar",
   firstName: "Daksh",
   handle: "daksh",
-  role: "AI Engineer, in Training @ Royal Holloway",
+  role: "AI Engineer in Training at Royal Holloway",
   location: "Egham, UK",
-  headline: "AI Engineer, In Training | Daksh",
+  headline: "Daksh Kumar, AI Engineer in Training",
   description:
-    "Final year CS student specialised in AI: RAG systems, harness engineering, fine-tuned models.",
+    "Final year computer science student at Royal Holloway, focused on AI. I build RAG systems, agent harnesses and fine-tuned models.",
   email: "dakshkumar2k2@gmail.com",
   linkedin: "https://linkedin.com/in/dakshkumar96",
   instagram: "https://www.instagram.com/_daksh.mov_",
   github: "https://github.com/dakshkumar96",
   command: "whoami",
   commandCopy: `Daksh Kumar
-AI Engineer, in Training @ Royal Holloway
-RAG systems, harness engineering, fine-tuned models
+AI Engineer in Training at Royal Holloway
+RAG systems, agent harnesses and fine-tuned models
 dakshkumar2k2@gmail.com
 https://linkedin.com/in/dakshkumar96`,
-  bio: "Final year CS student, specialised in AI. Left a small town in Pakistan to study in the UK, and now spend most of my time on things that don't fully exist yet: RAG systems, harness engineering, fine-tuned models. Also decent with people, somehow, and weirdly attached to SQL.",
+  bio: "Final year computer science student at Royal Holloway, focused on AI. I left a small town in Pakistan to study in the UK, and now spend most of my time building RAG systems, agent harnesses and fine-tuned models. I'm good with people too, and I genuinely enjoy writing SQL.",
 };
 
 export const homeAbout = {
   heading: "About Me",
   paragraph:
-    "CS student, AI focused, came to the UK alone from Pano Aqil, a small town in Sindh, Pakistan. I like working on RAG systems, harness engineering and fine-tuning models more than most people like their hobbies. Good with people too, comms and soft skills aren't an afterthought for me. And yes, SQL is genuinely one of my favourite things to write.",
+    "I'm a computer science student focused on AI. I came to the UK alone from Pano Aqil, a small town in Sindh, Pakistan. I enjoy building RAG systems, agent harnesses and fine-tuned models, and I care just as much about communication and working well with people. SQL is honestly one of my favourite things to write.",
 };
 
 export const categories = [
@@ -56,13 +56,13 @@ export const projects: Project[] = [
     title: "Threshold",
     oneLiner: "Job search for international students that checks every employer can sponsor a visa.",
     summary:
-      "Working out whether a UK employer can sponsor a Skilled Worker visa is slow and mostly guesswork. Threshold pulls live ads from Reed, Adzuna and employers' own careers boards, checks each employer against the Home Office register, and ranks sponsors by how long they have held their licence. Upload a CV and you also get a skill match and an AI review that is checked against the CV.",
+      "Finding out whether a UK employer can sponsor a Skilled Worker visa is slow and mostly guesswork. Threshold pulls live job ads from Reed, Adzuna and company careers pages, checks each employer against the Home Office sponsor register, and ranks them by how long they have held their licence. If you upload a CV, you also get a skill match and an AI review that is checked against what the CV actually says.",
     tags: ["Product", "Dev", "AI"],
     stack: ["FastAPI", "Next.js", "SQLite", "Groq", "Survival Analysis"],
     highlights: [
       "Every ad checked against 121,199 licensed sponsors",
       "Kaplan-Meier and Cox models over ten register snapshots since 2023",
-      "AI CV review whose claims only count if the quote is really in the CV",
+      "AI CV review that only counts a claim if the quote is really in the CV",
       "72 recorded API scenarios replayed on every change",
     ],
     featured: true,
@@ -76,7 +76,7 @@ export const projects: Project[] = [
     title: "RV-ML",
     oneLiner: "Conformal prediction for exoplanet orbits, calibrated on simulated stars.",
     summary:
-      "Estimates a planet's orbit from its star's radial-velocity curve, with prediction intervals that are calibrated on simulated data and still hold on real stars. The calibration is reweighted for the gap between simulated and real curves, so real stars never have to be used for it.",
+      "RV-ML estimates a planet's orbit from its star's radial velocity curve. Its prediction intervals are calibrated on simulated data and still hold on real stars, because the calibration is reweighted for the gap between simulated and real curves.",
     tags: ["Research", "AI", "Dev"],
     stack: ["Python", "PyTorch", "scikit-learn", "Conformal Prediction"],
     highlights: [
@@ -92,15 +92,15 @@ export const projects: Project[] = [
   {
     slug: "sakha",
     title: "Sakha",
-    oneLiner: "Voice-first companion grounded in the Bhagavad Gita, with safety rails.",
+    oneLiner: "A voice first companion grounded in the Bhagavad Gita, with safety built in.",
     summary:
-      "Sakha is a voice-first companion with crisis detection and retrieval over an allowlisted set of verses. It never presents itself as Krishna or as a therapist, and every answer cites the verse it draws on.",
+      "Sakha is a voice first companion with crisis detection and retrieval over an approved set of verses. It never presents itself as Krishna or as a therapist, and every answer cites the verse it comes from.",
     tags: ["AI", "Product", "Dev"],
     stack: ["FastAPI", "Gemini", "FAISS", "Web Speech API"],
     highlights: [
-      "Crisis detection L1–L4 with a hard safety gate",
-      "RAG with emotion-tag boosts and allowlist filtering",
-      "Citation wall: no hallucinated verses",
+      "Crisis detection across four levels with a hard safety gate",
+      "Retrieval that weighs emotion tags and filters to approved verses",
+      "Every verse is cited, so none can be made up",
       "Safety rules enforced in code rather than in the prompt",
     ],
     featured: true,
@@ -112,33 +112,33 @@ export const projects: Project[] = [
   {
     slug: "agents-of-deception",
     title: "Agents of Deception",
-    oneLiner: "Eight language-model agents in a Traitors-style house: who lies, and does anything change inside the model?",
+    oneLiner: "Eight language model agents in a Traitors style house, and whether lying shows up inside the model.",
     summary:
-      "My BSc final year project at Royal Holloway, supervised by Kostas Stathis. Eight language-model agents live in a house: most are told to be honest, two are secretly told to deceive, and two get no persona at all. Each cycle they play Iterated Prisoner's Dilemma rounds against each other, talk, and vote someone out. The question is whether patterns linked to trust and betrayal show up inside the model as well as in its words. It measures patterns, not feelings, and makes no claim that the agents hold genuine states.",
+      "My BSc final year project at Royal Holloway, supervised by Kostas Stathis. Eight language model agents share a house. Most are told to be honest, two are secretly told to deceive, and two get no persona at all. Each round they play the Iterated Prisoner's Dilemma against each other, talk, and vote someone out. The project asks whether patterns linked to trust and betrayal show up inside the model as well as in what it says. It measures patterns only and makes no claim that the agents have real feelings.",
     tags: ["Research", "AI"],
     stack: ["Python", "Ollama", "HuggingFace", "TransformerLens", "FastAPI"],
     highlights: [
-      "Eight agents: two Traitors, six Faithful, with a no-persona baseline",
+      "Eight agents, two Traitors and six Faithful, with a no persona baseline",
       "An Iterated Prisoner's Dilemma tournament under every trust decision",
       "Probes internal activations to see whether they predict the next move beyond history and messages",
       "Extends Curvo (2025) and Sobotka et al. (2026)",
     ],
     featured: true,
-    year: "2026–2027",
+    year: "2026 to 2027",
     status: "Final year project",
   },
   {
     slug: "reclaim",
     title: "Reclaim",
-    oneLiner: "Gamified habit tracking. XP, levels, streaks, leaderboards.",
+    oneLiner: "Gamified habit tracking with XP, levels, streaks and leaderboards.",
     summary:
-      "Full-stack habit platform I designed the schema for, wrote the API for, and then rebuilt the auth for after v1 failed.",
+      "A full stack habit platform. I designed the database, wrote the API, and rebuilt the login system after the first version failed.",
     tags: ["Product", "Dev"],
     stack: ["React", "Flask", "PostgreSQL", "Tailwind"],
     highlights: [
-      "Owned schema, REST API, and frontend",
+      "Owned the database, REST API and frontend",
       "XP, levels, streaks, and leaderboards",
-      "Rebuilt auth after the first flow failed in production-shaped ways",
+      "Rebuilt the login flow after the first version broke under real use",
     ],
     featured: false,
     year: "2025",
@@ -148,19 +148,19 @@ export const projects: Project[] = [
   {
     slug: "visual-work",
     title: "Visual Work",
-    oneLiner: "Posters, thumbnails, and a consistent identity for a student society.",
+    oneLiner: "Posters, thumbnails and one consistent look for a student society.",
     summary:
-      "I treated society comms and Palmy AI like products, with one visual system across everything. Posters, reels, podcast thumbnails, SEO packaging. Instagram 400 → 850. Video reach +30%.",
+      "I treated the society's comms and Palmy AI like products, with one visual system across posters, reels, podcast thumbnails and SEO. Instagram grew from 400 to 850 followers and video reach went up 30%.",
     tags: ["Design"],
     stack: ["Photoshop", "Canva", "Premiere Pro"],
     highlights: [
       "International Society visual identity and event campaigns",
-      "Palmy AI podcast packaging, trailers, and thumbnails",
-      "Instagram 400 → 850 followers (112%)",
+      "Palmy AI podcast packaging, trailers and thumbnails",
+      "Instagram grew from 400 to 850 followers, up 112%",
       "Video reach up 30% after full SEO setup",
     ],
     featured: false,
-    year: "2025–2026",
+    year: "2025 to 2026",
     status: "Ongoing",
   },
 ];
@@ -179,30 +179,30 @@ export const experience: Experience[] = [
     slug: "royal-holloway-research-assistant",
     org: "Royal Holloway",
     role: "Research Assistant",
-    dates: "May 2026 – Aug 2026",
+    dates: "May 2026 to Aug 2026",
     location: "Remote",
     bullets: [
-      "Built an ML model that estimates exoplanet orbital parameters in milliseconds instead of the hours Bayesian methods take.",
-      "Built the synthetic data pipeline behind it, simulating planetary signals from Kepler equations with real noise injected from NASA telescope observations.",
+      "Built an ML model that estimates exoplanet orbits in milliseconds, where Bayesian methods take hours.",
+      "Built the synthetic data pipeline behind it, simulating planet signals from Kepler's equations with real noise taken from NASA telescope observations.",
     ],
   },
   {
     slug: "international-society-president",
     org: "International Society, RHUL",
     role: "President",
-    dates: "May 2026 – Present",
+    dates: "May 2026 to present",
     bullets: [
-      "Running the society now. Spent the year before as social media manager, grew the Instagram by 112%, planned events, designed the posters and reels, kept the content calendar alive.",
+      "I run the society now. The year before, I was social media manager. I grew the Instagram by 112%, planned events, designed the posters and reels, and kept the content calendar going.",
     ],
   },
   {
     slug: "palmy-marketing-coordinator",
     org: "Palmy",
     role: "Marketing Coordinator",
-    dates: "Aug 2025 – Oct 2025",
+    dates: "Aug 2025 to Oct 2025",
     bullets: [
-      "Edited podcast episodes, cut trailers and shorts for YouTube, Instagram and TikTok.",
-      "Ran SEO across platforms, did the branding and thumbnails.",
+      "Edited podcast episodes and cut trailers and shorts for YouTube, Instagram and TikTok.",
+      "Ran SEO across platforms and designed the branding and thumbnails.",
     ],
   },
 ];
@@ -213,7 +213,7 @@ export function getExperience(slug: string) {
 
 export const skills = [
   {
-    title: "AI / ML",
+    title: "AI and ML",
     items: [
       "Claude API",
       "Gemini API",
@@ -273,18 +273,18 @@ export const education: EducationEntry[] = [
   {
     title: "BSc Computer Science",
     place: "Royal Holloway, University of London",
-    dates: "Jan 2025 – Jun 2027",
+    dates: "Jan 2025 to Jun 2027",
     note: "69.5% in second year. Predicted First Class.",
   },
   {
     title: "City School and College",
     place: "Pano Aqil, Pakistan",
-    dates: "2011 – 2024",
+    dates: "2011 to 2024",
   },
 ];
 
 export const achievements = [
-  "Maths District Olympiad, runner-up, 2024",
+  "Runner up, Maths District Olympiad, 2024",
   "150 LeetCode questions solved",
   "50 Project Euler problems solved",
 ];
@@ -300,15 +300,15 @@ export const about = {
   curve: "Who Am I?",
   kicker: "About Me",
   intro:
-    "Final year computer science student at Royal Holloway, specialised in AI. I spend most of my time on RAG systems, agentic engineering and fine-tuning models. Came to the UK on my own from a small town. Good with people, better with SQL than I probably should be.",
+    "I'm a final year computer science student at Royal Holloway, focused on AI. Most of my time goes into RAG systems, agent engineering and fine-tuning models. I came to the UK on my own from a small town. I'm good with people, and probably better at SQL than I need to be.",
   lookingFor:
-    "Currently looking for AI engineering, machine learning engineering, or AI software engineering roles.",
+    "Currently looking for roles in AI engineering, machine learning engineering or AI software engineering.",
   whoIAm: [
-    "First touched a computer at 6, got my first personal laptop at 12. Started video editing at 13, and was freelancing and earning off it by 15, same year I started coding, and it's been the same feeling ever since: watching one small line do something, then watching that line turn into a whole system, built out of what's basically just English.",
-    "Started using AI chatbots the day it launched. Kept going deeper from there, into machine learning, model behaviour, all of it, and it's turned into the thing I care about most now. That pull led to research on estimating exoplanet orbital parameters with ML.",
-    "I got on a flight to the UK alone, didn't know a single person here, coming from a small town in Pakistan. That's more or less been the pattern since: do the thing that scares you, learn from what breaks.",
-    "I've done a lot of things since: design, bartending, social media, student ambassador work. But the thing my heart actually loves is building tools that solve a problem I've hit myself, or watched someone around me hit. That's the thread running through everything I build. Sakha, a voice-first AI companion built on the Bhagavad Gita, and Threshold, a visa-sponsorship job matcher for international students, both came out of problems people around me were actually facing.",
-    "I meditate daily and journal every night, mostly to keep myself honest about where I actually am versus where I think I am. Outside of coding and AI I'm bartending, running the International Society as president, occasionally doing student ambassador and hall life work, and watching movies or listening to whatever music I'm into that week, which changes constantly.",
+    "I first used a computer at 6 and got my own laptop at 12. I started editing videos at 13 and was freelancing by 15, the same year I started coding. The feeling has stayed the same ever since. One small line does something, and then it grows into a whole system built from what is basically plain English.",
+    "I started using AI chatbots the day they launched and kept going deeper, into machine learning and how models behave. It has become the thing I care about most, and it led me to research on estimating exoplanet orbits with ML.",
+    "I flew to the UK alone from a small town in Pakistan, without knowing a single person here. That has been my pattern ever since. Do the thing that scares you, and learn from whatever breaks.",
+    "I've done a lot since then, from design and bartending to social media and student ambassador work. What I love most is building tools that fix a problem I've had myself or seen someone close to me struggle with. Sakha, a voice first AI companion built on the Bhagavad Gita, and Threshold, a visa sponsorship job matcher for international students, both started that way.",
+    "I meditate every day and journal every night, mostly to stay honest with myself about where I really am. Outside of code and AI I work behind a bar, run the International Society as president, and do student ambassador and hall life work. The rest of my time goes on films and on whatever music I'm into that week.",
   ],
 };
 
@@ -316,17 +316,17 @@ export const facts = [
   "Speaks four languages",
   "Runs on tea, not coffee",
   "Never without a notebook and pen",
-  "Thinks taste, your judgement of what's actually good AI output, is the real skill right now",
+  "Thinks taste, knowing what good AI output looks like, is the real skill right now",
   "Geeks out on fine-tuning models specifically",
-  "Just genuinely loves the research side of AI, no single person or lab he's chasing",
+  "Loves the research side of AI for its own sake",
   "Music taste has no consistent genre",
 ];
 
 export const contact = {
   curve: "Wanna Talk?",
-  kicker: "Touch Me",
+  kicker: "Get in Touch",
   blurb:
-    "If you wanna get in touch, email me or find me on LinkedIn. I actually reply :)",
+    "If you'd like to get in touch, email me or message me on LinkedIn. I always reply.",
 };
 
 export function getProject(slug: string) {

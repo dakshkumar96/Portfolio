@@ -82,7 +82,7 @@ export const aboutExhibits: ExhibitDatum[] = [
     title: "The Crossing",
     meta: "Sindh to the United Kingdom",
     body:
-      "At seventeen he took a flight to the United Kingdom alone, from a small town in Sindh, Pakistan, without knowing a single person on the other side. It became the pattern he has kept since: do the thing that frightens you, and learn from whatever breaks.",
+      "At seventeen he flew to the UK alone from a small town in Sindh, Pakistan, without knowing anyone there. He has followed the same rule since. Do the thing that scares you, and learn from whatever breaks.",
   },
   {
     id: "about-off-the-clock",
@@ -90,7 +90,7 @@ export const aboutExhibits: ExhibitDatum[] = [
     title: "Off the Clock",
     meta: "Practice and pastime",
     body:
-      "He meditates daily and keeps a journal every night, mostly to stay honest about where he actually is. Away from code he works behind a bar, runs the International Society as its president, and does student ambassador work. What time is left goes on films, and on whatever music has his attention that week.",
+      "He meditates every day and journals every night. Away from code he works behind a bar, runs the International Society as president and does student ambassador work. The rest of his time goes on films and whatever music he is into that week.",
   },
   /*
     The two cases either side of the photographs: the record behind the
@@ -102,7 +102,7 @@ export const aboutExhibits: ExhibitDatum[] = [
     id: "about-education",
     room: "about",
     title: "Education",
-    meta: "Royal Holloway · City School and College",
+    meta: "Royal Holloway and City School and College",
     bullets: education.map((entry) =>
       [`${entry.title}, ${entry.place}, ${entry.dates}.`, entry.note].filter(Boolean).join(" "),
     ),
@@ -111,7 +111,7 @@ export const aboutExhibits: ExhibitDatum[] = [
     id: "about-awards",
     room: "about",
     title: "Awards and Certificates",
-    meta: "Competitions, practice and a job simulation",
+    meta: "Competitions, coding practice and a job simulation",
     bullets: [
       ...achievements,
       ...certifications.map((cert) => `${cert.name}, issued ${cert.issued}.`),
@@ -135,49 +135,49 @@ const role = (
 
 export const experienceExhibits: ExhibitDatum[] = [
   // across the back
-  role("president", "President", "International Society, Royal Holloway", "Part-time · May 2026 – Present", [
+  role("president", "President", "International Society, Royal Holloway", "Part time · May 2026 to present", [
     "Launched a digital membership system with Apple Wallet cards, giving members discounts at local stores and guaranteed interviews with partner job agencies.",
-    "Run the society like a startup, with events nobody on campus had done before: the Night of Nations, a Cultural Fashion Show and a go-karting Rush Rally, many of them with the International Community and the other cultural societies.",
-    "Lead a committee of 10, coordinating day-to-day society operations.",
+    "Run the society like a startup, with events nobody on campus had done before, including the Night of Nations, a Cultural Fashion Show and a go karting Rush Rally, many run with the International Community and other cultural societies.",
+    "Lead a committee of 10 and coordinate the society's day to day running.",
   ]),
-  role("nextround", "Founding Product Engineer", "NextRound", "Part-time · Oct 2026 – Present · Hybrid", [
-    "Joined as one of the first engineers at an early-stage startup building evidence-based hiring, helping companies judge candidates on what they can actually do rather than just their CV, and work directly with the CEO on the core product.",
+  role("nextround", "Founding Product Engineer", "NextRound", "Part time · Oct 2026 to present · Hybrid", [
+    "Joined as one of the first engineers at an early stage startup building evidence based hiring, which helps companies judge candidates on what they can actually do. I work directly with the CEO on the core product.",
     "Improving the NextRound portal and the candidate assessment experience, using feedback from early users to decide what to fix and build first.",
     "Run the platform locally to test changes properly before anything goes live.",
     "Help shape the product roadmap and think through how the platform should grow as we take on more clients.",
   ]),
-  role("research", "Research Assistant", "Royal Holloway", "Internship · May 2026 – Aug 2026 · Remote", [
-    "Co-authored research applying conformal prediction to exoplanet orbital parameter estimation from radial-velocity data, achieving 100% empirical coverage against a 90% nominal target on 34 held-out real stars, with no vacuous intervals.",
-    "Designed and built the synthetic data generation pipeline, simulating planetary RV signals from Kepler orbital equations and injecting real noise sampled from NASA telescope observations.",
-    "Implemented a likelihood-ratio reweighting scheme (Tibshirani et al., 2019) so uncertainty intervals calibrated entirely on synthetic data transfer validly to real, unseen observations under distribution shift.",
+  role("research", "Research Assistant", "Royal Holloway", "Internship · May 2026 to Aug 2026 · Remote", [
+    "Co-authored research applying conformal prediction to estimating exoplanet orbits from radial velocity data. It reached 100% coverage against a 90% target on 34 held out real stars, with no empty intervals.",
+    "Designed and built the synthetic data pipeline, simulating planet signals from Kepler's equations and adding real noise taken from NASA telescope observations.",
+    "Implemented likelihood ratio reweighting (Tibshirani et al., 2019) so intervals calibrated only on synthetic data still hold on real, unseen observations.",
   ]),
   // the left wall
-  role("host", "Host", "Insanity Radio 103.2FM", "Part-time · Oct 2026 – Present · Egham, on-site", [
-    "Host Artificial Insanity, a weekly one-hour talk show on Insanity Radio, Royal Holloway's student and community station. It breaks down the latest AI news in plain English for everyone, not just tech students, with a focus on how AI is changing everyday life, work and study.",
+  role("host", "Host", "Insanity Radio 103.2FM", "Part time · Oct 2026 to present · Egham, on site", [
+    "Host Artificial Insanity, a weekly hour long talk show on Insanity Radio, Royal Holloway's student and community station. The show explains the latest AI news in plain English for anyone, with a focus on how AI is changing everyday life, work and study.",
     "Invite Royal Holloway academics and people working in industry as guests to share their perspective on where AI is heading.",
-    "Some episodes also cover careers, student life and the real day-to-day challenges international students face.",
+    "Some episodes also cover careers, student life and the everyday challenges international students face.",
     "Came in with no radio experience and took this on to push myself, get better at speaking live, and have honest conversations with interesting people.",
   ]),
-  role("marketing", "Marketing Coordinator", "Palmy", "Internship · Aug 2025 – Oct 2025 · Hybrid", [
-    "Edited long-form podcast episodes in Premiere Pro and produced trailers and short-form clips for YouTube, Instagram and TikTok.",
-    "Handled full SEO setup across platforms, including titles, descriptions, tags and thumbnails, to improve discoverability.",
+  role("marketing", "Marketing Coordinator", "Palmy", "Internship · Aug 2025 to Oct 2025 · Hybrid", [
+    "Edited full podcast episodes in Premiere Pro and made trailers and short clips for YouTube, Instagram and TikTok.",
+    "Set up SEO across platforms, including titles, descriptions, tags and thumbnails, so the content was easier to find.",
     "Designed branding and thumbnail visuals in Photoshop, building a consistent look across all distributed content.",
   ]),
   role("video", "Video Editor", "Freelance", "Freelance · from the age of fifteen", [
     "Began editing at thirteen and was freelancing by fifteen.",
   ]),
   // the right wall
-  role("ambassador", "Student Ambassador", "Royal Holloway", "Part-time · Sep 2026 – Present · Egham, on-site", [
-    "Speak directly with prospective students and their families at open days and campus tours, building strong communication skills through regular public-facing interaction.",
-    "Engage with a wide range of visitors, from sixth form students to parents and teachers, adjusting how I present the university depending on who I am talking to.",
+  role("ambassador", "Student Ambassador", "Royal Holloway", "Part time · Sep 2026 to present · Egham, on site", [
+    "Talk with prospective students and their families at open days and campus tours.",
+    "Meet a wide range of visitors, from sixth form students to parents and teachers, and adapt how I present the university to each of them.",
   ]),
-  role("hall-life", "Hall Life Assistant", "Royal Holloway", "Part-time · Sep 2026 – Present · Egham, on-site", [
+  role("hall-life", "Hall Life Assistant", "Royal Holloway", "Part time · Sep 2026 to present · Egham, on site", [
     "Support residents across halls of residence, running kitchen meetings and flat meetings to check in on wellbeing and catch problems early.",
-    "Mediate conflicts between flatmates and help resolve day-to-day living issues before they escalate.",
-    "Handle critical incidents when they come up, and signpost residents to the right university support services: wellbeing, welfare, or wherever they need.",
+    "Mediate between flatmates and help sort out everyday problems before they grow.",
+    "Handle critical incidents and point residents to the right university support, whether that is wellbeing, welfare or something else.",
   ]),
-  role("bar", "Bar Associate", "J D Wetherspoon", "Part-time · Feb 2026 – Present · Windsor, on-site", [
-    "Work across both bar and floor service at a large, three-level city-centre pub with a staff of around 80.",
+  role("bar", "Bar Associate", "J D Wetherspoon", "Part time · Feb 2026 to present · Windsor, on site", [
+    "Work bar and floor service at a large three floor pub in Windsor with a team of around 80.",
     "Handle customer complaints and resolve issues directly, staying calm and solving problems under pressure.",
   ]),
   // the two boards between the cases at the back
@@ -185,17 +185,17 @@ export const experienceExhibits: ExhibitDatum[] = [
     id: "exp-alongside",
     room: "experience",
     title: "Alongside the Degree",
-    meta: "Work that is not on the CV",
+    meta: "The work around his studies",
     body:
-      "Behind a bar, as a student ambassador and in hall life, and cutting video: he began editing at thirteen and was freelancing by fifteen.",
+      "He works behind a bar, as a student ambassador and in hall life, and he edits video. He started editing at thirteen and was freelancing by fifteen.",
   },
   {
     id: "exp-figures",
     room: "experience",
     title: "In Figures",
-    meta: "The roles, read as numbers",
+    meta: "His roles in numbers",
     body:
-      "He leads a committee of ten and works a three-level pub with a staff of around eighty. His research reached 100% empirical coverage against a 90% target on 34 held-out real stars.",
+      "He leads a committee of ten and works in a three floor pub with a team of around eighty. His research reached 100% coverage against a 90% target on 34 held out real stars.",
   },
 ];
 
@@ -262,27 +262,27 @@ export const artPieces: Record<string, ExhibitDatum> = {
     "fashion",
     "Cultural Fashion Show",
     "Poster · International Society x International Community",
-    "A runway night for the society's international community: wear your culture, show your style and celebrate the world together. Red curtains and a lit staircase set the stage.",
-    ["8th October, SU Hall, 18:00 to 20:00"],
+    "A runway night for the society's international community, where students wear their culture and celebrate together. Red curtains and a lit staircase set the stage.",
+    ["8th October, SU Hall, 6pm to 8pm"],
   ),
   "/museum/art-2.webp": piece(
     "wrap",
     "Term 1 Wrap",
     "Graphic · RHUL International Society",
-    "The society's first term, closed out as a scrapbook: photographs from the stall, the stage and the go-karting day, pinned on a film-strip ground under a yellow folder.",
+    "The society's first term as a scrapbook, with photos from the stall, the stage and the go karting day pinned to a film strip under a yellow folder.",
   ),
   "/museum/art-3.webp": piece(
     "potluck",
     "Potluck",
     "Poster · RHUL International Society x International Community",
-    "A day of shared food, with everyone bringing something from home. Illustrated, warm and loud on purpose, to feel like the table it advertises.",
+    "A day of shared food where everyone brings something from home. The illustration is warm and busy on purpose, so it feels like the table it is advertising.",
     ["8th October, 9am to 5pm, SU Hall"],
   ),
   "/museum/art-4.webp": piece(
     "movie",
     "Movie Night",
     "Poster · International Community x International Society",
-    "A film evening in a lecture theatre. A script title over an empty screen and a dark house, so the poster reads as the room it is for.",
+    "A film night in a lecture theatre, shown as a script title over an empty screen in a dark room.",
     ["10th October, 6 to 8pm, Bourne LT2"],
   ),
   "/museum/art-5.webp": piece(
@@ -291,59 +291,59 @@ export const artPieces: Record<string, ExhibitDatum> = {
     "Programme · September and October",
     "The society's calendar on one sheet, each event in its own colour so the week can be read at a glance.",
     [
-      "22nd: Freshers Fair, 09:30 to 17:00, Founders Square",
-      "24th: Taster Session, 19:00 to 19:50, Boilerhouse 007",
-      "30th: A Letter to Future Me, 18:00 to 20:00",
-      "6th: Sip and Paint, 19:00 to 21:00",
+      "22nd, Freshers Fair, 9.30am to 5pm, Founders Square",
+      "24th, Taster Session, 7pm to 7.50pm, Boilerhouse 007",
+      "30th, A Letter to Future Me, 6pm to 8pm",
+      "6th, Sip and Paint, 7pm to 9pm",
     ],
   ),
   "/museum/art-6.webp": piece(
     "nations",
     "Night of Nations",
     "Poster · International Community x International Society",
-    "The society's biggest night: a globe ringed by the landmarks of the world, with the crest of each national and cultural society round the edge.",
+    "The society's biggest night, shown as a globe ringed with world landmarks and the crest of each national and cultural society around the edge.",
     ["7th October 2025, 10pm, last entry 12am, SU", "Students £4, guests £6"],
   ),
   "/museum/art-7.webp": piece(
     "rally",
     "Rush Rally",
     "Poster · RHUL International Society",
-    "A go-karting day built as a race poster: a chequered flag, a car at speed, and the schedule set like a timing sheet.",
-    ["TeamSport Go-Karting Reading, 26th November 2025", "Only 28 spots available"],
+    "A go karting day designed as a race poster, with a chequered flag, a car at speed and the schedule laid out like a timing sheet.",
+    ["TeamSport Go Karting Reading, 26th November 2025", "Only 28 spots available"],
   ),
   "/museum/thumb-1.webp": piece(
     "thumb-rich",
     "Get Rich with A.I",
     "Video thumbnail",
-    "A thumbnail for a video on making money with AI: a robotic figure in a bowler hat, banknotes in the air and the title cut across the top in glowing blue.",
+    "A thumbnail for a video on making money with AI, with a robot in a bowler hat, banknotes in the air and the title in glowing blue.",
     ["One of the 150+ videos edited end to end across two YouTube channels"],
   ),
   "/museum/thumb-2.webp": piece(
     "thumb-escape",
     "Escape This",
     "Video thumbnail",
-    "A thumbnail as a single diagram: a crowd of drawn figures piled under a bell curve and one red figure standing clear of it.",
+    "A thumbnail built as one diagram, a crowd of figures under a bell curve and one red figure standing apart from them.",
     ["One of the 150+ videos edited end to end across two YouTube channels"],
   ),
   "/museum/thumb-3.webp": piece(
     "thumb-marlon",
     "Interviewing Brown Marlon",
     "Video thumbnail",
-    "A thumbnail for an interview: two people at studio microphones, turned to face each other, with the guest's name on a yellow label.",
+    "A thumbnail for an interview, with two people facing each other at studio microphones and the guest's name on a yellow label.",
     ["One of the 150+ videos edited end to end across two YouTube channels"],
   ),
   "/museum/thumb-4.webp": piece(
     "thumb-untold",
     "The Untold Story",
     "Video thumbnail",
-    "A thumbnail for a story told from the inside: one face broken into torn paper and colour, the title across the top.",
+    "A thumbnail for a personal story, with one face broken up into torn paper and colour and the title across the top.",
     ["One of the 150+ videos edited end to end across two YouTube channels"],
   ),
   "/museum/thumb-5.webp": piece(
     "thumb-insanity",
     "Insanity?",
     "Video thumbnail",
-    "A thumbnail built to stop a scroll: three famous faces, coloured bars over their eyes and a one-word question in yellow.",
+    "A thumbnail made to stop people scrolling, with three famous faces, coloured bars over their eyes and a one word question in yellow.",
     ["One of the 150+ videos edited end to end across two YouTube channels"],
   ),
   // the side walls
@@ -357,19 +357,19 @@ export const artPieces: Record<string, ExhibitDatum> = {
     "stat-followers",
     "5,000+ Followers",
     "One managed page · Palmy AI",
-    "A single managed page grown past five thousand followers.",
+    "One page he manages, grown past five thousand followers.",
   ),
   "stat-videos": piece(
     "stat-videos",
     "150+ Videos",
     "Edited end to end · two YouTube channels",
-    "More than a hundred and fifty videos edited from raw footage to upload across two YouTube channels, thumbnails and titles included.",
+    "More than 150 videos edited from raw footage to upload across two YouTube channels, including thumbnails and titles.",
   ),
   "stat-weekly": piece(
     "stat-weekly",
     "50+ People Weekly",
     "Campus activations · Higherin",
-    "On-campus campaigns that reach fifty or more people every week.",
+    "Campus campaigns that reach fifty or more people every week.",
   ),
   "series-system": piece(
     "system",
@@ -381,7 +381,7 @@ export const artPieces: Record<string, ExhibitDatum> = {
     "identity",
     "The International Society",
     "Visual identity and event campaigns",
-    "The look of a student society: one identity carried across every poster, event campaign and post, from the Night of Nations to the Rush Rally.",
+    "One identity for a student society, carried across every poster, campaign and post, from the Night of Nations to the Rush Rally.",
   ),
 };
 
@@ -393,7 +393,7 @@ export const artBoards: ExhibitDatum[] = [
     title: "The Visual Work",
     meta: "Posters, thumbnails and an identity",
     body:
-      "Society comms and Palmy AI were treated like products, with one visual system across everything: posters, reels, podcast thumbnails and the SEO packaging around them. The wall shows seven posters from the International Society and five thumbnails from the videos edited alongside them.",
+      "He treated the society's comms and Palmy AI like products, with one visual system across posters, reels, podcast thumbnails and SEO. This wall shows seven posters from the International Society and five thumbnails from videos he edited.",
   },
   {
     id: "art-board-numbers",
@@ -469,7 +469,7 @@ export const caseExhibits: ExhibitDatum[] = [
     title: "Quantum Computing",
     meta: "Model of a dilution refrigerator",
     body:
-      "The gold chandelier usually pictured as a quantum computer is the refrigerator around it. Each stage is colder than the one above, until the qubits at the bottom sit a fraction of a degree above absolute zero, where their quantum states last long enough to compute with. A subject he reads about for its own sake.",
+      "The gold chandelier people picture as a quantum computer is actually the refrigerator around it. Each stage is colder than the one above, until the qubits at the bottom sit just above absolute zero, cold enough for their quantum states to last. He reads about it for fun.",
   },
   {
     id: "case-brain",
@@ -477,7 +477,7 @@ export const caseExhibits: ExhibitDatum[] = [
     title: "Brain and Neurons",
     meta: "Anatomical model",
     body:
-      "He reads about how working with AI changes the way people think, and about where the way these models learn resembles the way we do.",
+      "He reads about how working with AI changes the way people think, and where these models learn in ways similar to us.",
     links: [{ label: "Model credits", href: "/credits" }],
   },
   {
@@ -485,7 +485,7 @@ export const caseExhibits: ExhibitDatum[] = [
     room: "art",
     title: "Cinema",
     meta: "Film camera",
-    body: "He watches a great deal of film. It is the one thing he does that is never work.",
+    body: "He watches a lot of films. It is the one thing he does purely for fun.",
   },
   {
     id: "case-claude",
@@ -504,7 +504,7 @@ export const hallExhibits: ExhibitDatum[] = [
     title: "The Flight Over",
     meta: "Photograph. On the way to the United Kingdom",
     body:
-      "Daksh on the flight to the UK. He made the journey alone, leaving a small town in Sindh, Pakistan, for a country where he did not know a single person. Most of what hangs in this museum came after this flight.",
+      "Daksh on his flight to the UK. He made the journey alone, leaving a small town in Sindh, Pakistan, for a country where he knew nobody. Most of what is in this museum came after this flight.",
   },
 ];
 
@@ -515,7 +515,7 @@ export const hackathonExhibit: ExhibitDatum = {
   title: "Hackathons and London",
   meta: "Photograph. Where he goes to learn",
   body:
-    "Most weekends he is at a hackathon or a tech event somewhere in London, building late and meeting people who are further along than he is. That is why he goes: to be the least experienced person at the table and learn from everyone else at it. He loves living in London for exactly that.",
+    "Most weekends he is at a hackathon or tech event in London, building late and meeting people who are further along than he is. He goes to be the least experienced person in the room and learn from everyone there. It is a big part of why he loves living in London.",
 };
 
 export const societyExhibit: ExhibitDatum = {
@@ -524,7 +524,7 @@ export const societyExhibit: ExhibitDatum = {
   title: "The Society",
   meta: "Photograph. President, International Society, Royal Holloway",
   body:
-    "He is president of the International Society at Royal Holloway, and loves it more than anything else he does. He runs it like a startup: new kinds of events, things nobody on campus had tried, and ideas that had not been done before, like the Apple Wallet membership card, partnerships with local businesses and events people come back for.",
+    "He is president of the International Society at Royal Holloway, and it is his favourite thing he does. He runs it like a startup, with new kinds of events, an Apple Wallet membership card, partnerships with local businesses and events people keep coming back to.",
 };
 
 export const childhoodExhibit: ExhibitDatum = {
@@ -533,7 +533,7 @@ export const childhoodExhibit: ExhibitDatum = {
   title: "Where It Started",
   meta: "Photograph. Childhood, at home",
   body:
-    "Daksh as a boy, in a checked shirt and sunglasses a size too big, tilting his head for the camera. This was before the flight, the degree and the first line of code.",
+    "Daksh as a boy, in a checked shirt and sunglasses a size too big, tilting his head for the camera. This was long before the flight, the degree and his first line of code.",
 };
 
 export const exhibitsByRoom: Record<RoomId, ExhibitDatum[]> = {

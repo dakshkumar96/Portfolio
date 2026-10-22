@@ -58,7 +58,7 @@ const SERIES: PosterSpec[] = [
   },
   {
     title: ["One Visual", "System"],
-    line: "Instagram 400 → 850 followers",
+    line: "Instagram grew from 400 to 850 followers",
     image: "/museum/art-3.webp",
     focus: [0.5, 0.62],
     ground: "#5b2018",
