@@ -108,9 +108,9 @@ void main() {`)
     .replace(
       "#include <normal_fragment_maps>",
       `#include <normal_fragment_maps>
-	vec3 grainAt = vMarbleWorld * 90.0;
+	vec3 grainAt = vMarbleWorld * 240.0;
 	vec3 grain = vec3( mNoise( grainAt ), mNoise( grainAt + 17.3 ), mNoise( grainAt + 41.7 ) ) - 0.5;
-	normal = normalize( normal + ( viewMatrix * vec4( grain, 0.0 ) ).xyz * 0.06 );`,
+	normal = normalize( normal + ( viewMatrix * vec4( grain, 0.0 ) ).xyz * 0.022 );`,
     )
     .replace(
       "#include <opaque_fragment>",
