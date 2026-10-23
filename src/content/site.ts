@@ -334,7 +334,7 @@ export const education: EducationEntry[] = [
     title: "BSc Computer Science",
     place: "Royal Holloway, University of London",
     dates: "Jan 2025 to Jun 2027",
-    note: "69.25% in second year. Predicted First Class.",
+    note: "69.25% in second year. Aiming for a First.",
   },
   {
     title: "City School and College",
