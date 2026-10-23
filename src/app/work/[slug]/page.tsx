@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ProjectArt } from "@/components/ProjectArt";
 import { getProject, projects } from "@/content/site";
+import { ExternalLink } from "@/components/ExternalLink";
 
 export function generateStaticParams() {
   return projects.map((project) => ({ slug: project.slug }));
@@ -47,14 +48,14 @@ export default async function WorkPage({ params }: PageProps<"/work/[slug]">) {
         {project.live || project.repo ? (
           <div className="tag-row" style={{ marginTop: 28 }}>
             {project.live ? (
-              <a className="tag" href={project.live} target="_blank" rel="noreferrer">
+              <ExternalLink className="tag" href={project.live}>
                 Visit the live site ↗
-              </a>
+              </ExternalLink>
             ) : null}
             {project.repo ? (
-              <a className="tag" href={project.repo} target="_blank" rel="noreferrer">
+              <ExternalLink className="tag" href={project.repo}>
                 View the code ↗
-              </a>
+              </ExternalLink>
             ) : null}
           </div>
         ) : null}

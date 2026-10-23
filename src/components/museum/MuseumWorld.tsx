@@ -15,6 +15,7 @@ import { ToolBox } from "./ToolBox";
 import { CatalogueStamp, HeritageDefs, WaxSeal } from "./Heritage";
 import { LoadingVeil } from "./LoadingVeil";
 import { site } from "@/content/site";
+import { SiteLink } from "@/components/ExternalLink";
 
 if (typeof window !== "undefined") {
   gsap.registerPlugin(ScrollTrigger);
@@ -104,17 +105,12 @@ function CardContents({ exhibit, index, onClose }: { exhibit: ExhibitDatum; inde
       ) : null}
       {exhibit.links?.length ? (
         <div className="museum-contact-links">
-          {exhibit.links.map((link) =>
-            link.external ? (
-              <a key={link.href} href={link.href} target="_blank" rel="noreferrer">
-                {link.label}
-              </a>
-            ) : (
-              <Link key={link.href} href={link.href}>
-                {link.label}
-              </Link>
-            ),
-          )}
+          {/* each goes where its address says: away from the site in a new tab, the credits and mail in this one */}
+          {exhibit.links.map((link) => (
+            <SiteLink key={link.href} href={link.href}>
+              {link.label}
+            </SiteLink>
+          ))}
         </div>
       ) : null}
       {/* only links that go somewhere: a project with no live site and no public code shows none */}
@@ -137,13 +133,7 @@ function CardContents({ exhibit, index, onClose }: { exhibit: ExhibitDatum; inde
           {exhibit.actions
             .filter((action) => action.href)
             .map((action) => (
-              <a
-                key={action.label}
-                className="cat-action"
-                href={action.href}
-                target="_blank"
-                rel="noreferrer"
-              >
+              <SiteLink key={action.label} className="cat-action" href={action.href as string}>
                 {action.label}
                 <svg viewBox="0 0 12 12" aria-hidden="true" focusable="false">
                   <path
@@ -155,7 +145,7 @@ function CardContents({ exhibit, index, onClose }: { exhibit: ExhibitDatum; inde
                     strokeLinejoin="round"
                   />
                 </svg>
-              </a>
+              </SiteLink>
             ))}
         </div>
       ) : null}

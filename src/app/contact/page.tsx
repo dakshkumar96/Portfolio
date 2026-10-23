@@ -1,6 +1,7 @@
 import { Avatar } from "@/components/Avatar";
 import { CurveTitle } from "@/components/CurveTitle";
 import { contact, site } from "@/content/site";
+import { ExternalLink } from "@/components/ExternalLink";
 
 export default function ContactPage() {
   return (
@@ -10,24 +11,12 @@ export default function ContactPage() {
       <p className="page-kicker">{contact.kicker}</p>
       <p className="contact-copy">{contact.blurb}</p>
       <div className="social-row">
-        <a
-          className="social-btn"
-          href={site.linkedin}
-          target="_blank"
-          rel="noreferrer"
-          aria-label="LinkedIn"
-        >
+        <ExternalLink className="social-btn" href={site.linkedin} aria-label="LinkedIn">
           <LinkedInIcon />
-        </a>
-        <a
-          className="social-btn"
-          href={site.instagram}
-          target="_blank"
-          rel="noreferrer"
-          aria-label="Instagram"
-        >
+        </ExternalLink>
+        <ExternalLink className="social-btn" href={site.instagram} aria-label="Instagram">
           <InstagramIcon />
-        </a>
+        </ExternalLink>
         <a className="social-btn" href={`mailto:${site.email}`} aria-label="Email">
           <MailIcon />
         </a>

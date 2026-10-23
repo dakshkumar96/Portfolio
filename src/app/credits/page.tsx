@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { Metadata } from "next";
+import { ExternalLink } from "@/components/ExternalLink";
 
 export const metadata: Metadata = {
   title: "Model credits",
@@ -44,13 +45,7 @@ export default function CreditsPage() {
       <h1 className="serif credits-title">Model credits</h1>
       <p className="credits-intro">
         The 3D models in the museum are licensed under{" "}
-        <a
-          href="https://creativecommons.org/licenses/by/4.0/"
-          target="_blank"
-          rel="noreferrer"
-        >
-          CC BY 4.0
-        </a>
+        <ExternalLink href="https://creativecommons.org/licenses/by/4.0/">CC BY 4.0</ExternalLink>
         . Credit to their authors below.
       </p>
 
@@ -60,10 +55,8 @@ export default function CreditsPage() {
             <h2>{model.title}</h2>
             <p>
               by{" "}
-              <a href={model.authorUrl} target="_blank" rel="noreferrer">
-                {model.author}
-              </a>{" "}
-              · <a href={model.source} target="_blank" rel="noreferrer">source</a>
+              <ExternalLink href={model.authorUrl}>{model.author}</ExternalLink>{" "}
+              · <ExternalLink href={model.source}>source</ExternalLink>
             </p>
             <p className="credits-used">{model.used}</p>
           </li>

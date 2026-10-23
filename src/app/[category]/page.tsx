@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { categories, getProjectsByCategory, site } from "@/content/site";
 import { ProjectGrid } from "@/components/ProjectCard";
+import { ExternalLink } from "@/components/ExternalLink";
 
 export function generateStaticParams() {
   return categories.map((category) => ({ category: category.slug }));
@@ -30,15 +31,10 @@ export default async function CategoryPage({ params }: PageProps<"/[category]">)
         </h1>
         <p>Things that live in this corner of my brain.</p>
         {category === "dev" ? (
-          <a
-            href={site.github}
-            target="_blank"
-            rel="noreferrer"
-            className="github-link"
-          >
+          <ExternalLink href={site.github} className="github-link">
             <GitHubIcon />
             View on GitHub
-          </a>
+          </ExternalLink>
         ) : null}
       </section>
       <div style={{ height: 36 }} />

@@ -30,7 +30,8 @@ export type ExhibitDatum = {
    * the button is shown, dimmed, instead of vanishing.
    */
   actions?: { label: string; href?: string }[];
-  links?: { label: string; href: string; external?: boolean }[];
+  /** Where each goes decides how it opens (see SiteLink): another site in a new tab, this one in the same tab. */
+  links?: { label: string; href: string }[];
 };
 
 const isDesign = (tags: string[]) => tags.includes("Design");
@@ -414,9 +415,9 @@ export const contactExhibits: ExhibitDatum[] = [
     body: contact.blurb,
     links: [
       { label: site.email, href: `mailto:${site.email}` },
-      { label: "LinkedIn", href: site.linkedin, external: true },
-      { label: "Instagram", href: site.instagram, external: true },
-      { label: "GitHub", href: site.github, external: true },
+      { label: "LinkedIn", href: site.linkedin },
+      { label: "Instagram", href: site.instagram },
+      { label: "GitHub", href: site.github },
     ],
   },
 ];

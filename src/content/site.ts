@@ -2,6 +2,7 @@ export const site = {
   name: "Daksh Kumar",
   firstName: "Daksh",
   handle: "daksh",
+  url: "https://dakshkumar.space",
   role: "AI Engineer in Training at Royal Holloway",
   location: "Egham, UK",
   headline: "Daksh Kumar, AI Engineer in Training",

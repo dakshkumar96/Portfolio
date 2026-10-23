@@ -7,6 +7,7 @@ import {
   site,
   skills,
 } from "@/content/site";
+import { ExternalLink } from "@/components/ExternalLink";
 
 export const metadata = {
   title: "Resume | Daksh Kumar",
@@ -25,9 +26,7 @@ export default function ResumePage() {
         <p style={{ marginTop: 8 }}>
           <a href={`mailto:${site.email}`}>{site.email}</a>
           {" · "}
-          <a href={site.linkedin} target="_blank" rel="noreferrer">
-            LinkedIn
-          </a>
+          <ExternalLink href={site.linkedin}>LinkedIn</ExternalLink>
         </p>
       </header>
 
