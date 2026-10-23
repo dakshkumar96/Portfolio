@@ -141,8 +141,8 @@ const vec2 DISK[ 16 ] = vec2[ 16 ](
   moved a little off the surface along its normal (more where the light
   grazes it) so the stone never shadows itself in specks, then a search
   round it finds what lies between it and the lamp, and how far above:
-  the further the caster, the wider the soft edge, from about one and a
-  half texels where they touch to six. Each sample further out is allowed
+  the further the caster, the wider the soft edge, from three texels where
+  they touch to seven. Each sample further out is allowed
   to sit that much nearer the lamp before it counts, by the slope of the
   surface to the light: on a face turned steeply from a lamp overhead, the
   stone a few texels away really is nearer the lamp, and is not a shadow.
@@ -158,16 +158,17 @@ float keyLight( vec3 p, vec3 n ) {
 	vec2 uv = c.xy / c.w * 0.5 + 0.5;
 	if ( uv.x <= 0.0 || uv.y <= 0.0 || uv.x >= 1.0 || uv.y >= 1.0 ) return 1.0;
 	float range = uSelfShadowRange.y - uSelfShadowRange.x;
-	float here = ( distance( q, uKeyWorld ) - uSelfShadowRange.x - 0.003 ) / range;
+	float here = ( distance( q, uKeyWorld ) - uSelfShadowRange.x - 0.006 ) / range;
 	float blockers = 0.0;
 	float found = 0.0;
 	for ( int i = 0; i < 16; i ++ ) {
-		float d = texture2D( uSelfShadowMap, uv + DISK[ i ] * 6.0 * uSelfShadowTexel ).r;
+		float d = texture2D( uSelfShadowMap, uv + DISK[ i ] * 7.0 * uSelfShadowTexel ).r;
 		if ( d < here - slope * 6.0 * length( DISK[ i ] ) / range ) { blockers += d; found += 1.0; }
 	}
 	if ( found < 0.5 ) return 1.0;
 	float gap = ( here - blockers / found ) * range;
-	float texels = clamp( 1.5 + gap * 25.0, 1.5, 6.0 );
+	// never narrower than three texels: the scan's surface is bumpy at about one texel, and a narrower edge broke into specks there
+	float texels = clamp( 3.0 + gap * 25.0, 3.0, 7.0 );
 	float lit = 0.0;
 	for ( int i = 0; i < 16; i ++ ) {
 		float allow = slope * texels * length( DISK[ i ] ) / range;
@@ -220,11 +221,11 @@ vec3 carveEye( vec3 p, vec3 centre, inout float shade ) {
 	vec3 outward = across / max( d, 1e-5 );
 	// a narrow groove round the iris
 	float x = d - 0.0040;
-	float tilt = - 2.0 * 0.6 * ( x / 0.0006 ) * exp( - x * x / ( 0.0006 * 0.0006 ) );
+	float tilt = - 2.0 * 0.32 * ( x / 0.0006 ) * exp( - x * x / ( 0.0006 * 0.0006 ) );
 	// the pupil, a shallow bowl, shadowed in its depth
 	if ( d < 0.0015 ) {
-		tilt -= 0.7 * d / 0.0015;
-		shade *= 0.55 + 0.45 * d / 0.0015;
+		tilt -= 0.4 * d / 0.0015;
+		shade *= 0.74 + 0.26 * d / 0.0015;
 	}
 	return outward * tilt;
 }
@@ -341,7 +342,7 @@ void main() {`)
 	vec3 fromMouth = lp - uMouth;
 	float stubble = vHead
 		* smoothstep( - 0.003, - 0.007, fromMouth.y )
-		* smoothstep( uChin.y - 0.016, uChin.y - 0.008, lp.y )
+		* smoothstep( uChin.y - 0.005, uChin.y - 0.0005, lp.y )
 		* ( 1.0 - smoothstep( 0.03, 0.046, abs( fromMouth.x ) ) )
 		* smoothstep( - 0.07, - 0.04, fromMouth.z )
 		* smoothstep( 0.006, 0.010, length( fromMouth.xy ) );
@@ -379,8 +380,8 @@ void main() {`)
 	vec3 strandAt = lp * vec3( 900.0, 900.0, 60.0 );
 	carve += vec3( mNoise( strandAt ) - 0.5, mNoise( strandAt + 13.1 ) - 0.5, 0.0 ) * 0.3 * hair;
 	// stubble: a stipple of tiny pits
-	vec3 pitAt = floor( lp * 2600.0 );
-	carve += ( vec3( mHash( pitAt ), mHash( pitAt + 7.7 ), mHash( pitAt + 3.3 ) ) - 0.5 ) * 0.22 * stubble * step( 0.55, mHash( pitAt + 1.9 ) );
+	vec3 pitAt = floor( lp * 4200.0 );
+	carve += ( vec3( mHash( pitAt ), mHash( pitAt + 7.7 ), mHash( pitAt + 3.3 ) ) - 0.5 ) * 0.07 * stubble * step( 0.55, mHash( pitAt + 1.9 ) );
 	carve += ( grain * 0.6 ) * chip;
 	carve += eyeCut;
 	/*
@@ -441,11 +442,11 @@ void main() {`)
 		float stache = ( 1.0 - smoothstep( 0.004, 0.007, dLip ) ) * ( 1.0 - smoothstep( 0.006, 0.011, dNose ) ) * smoothstep( 0.001, 0.003, above );
 		vec3 stacheAt = vec3( lp.x * 2400.0, lp.y * 520.0 + abs( lp.x - uMouth.x ) * 900.0, lp.z * 2400.0 );
 		carve += vec3( mNoise( stacheAt ) - 0.5, 0.0, mNoise( stacheAt + 2.7 ) - 0.5 ) * 0.4 * stache;
-		faceShade *= 1.0 - 0.08 * stache;
+		faceShade *= 1.0 - 0.05 * stache;
 		// the chin beard, thicker in the middle of the chin than along the jaw
 		float goatee = stubble * ( 1.0 - smoothstep( 0.006, 0.016, abs( lp.x - uMouth.x ) ) );
-		carve += ( grain * 1.2 ) * goatee;
-		faceShade *= 1.0 - 0.06 * goatee;
+		carve += ( grain * 0.6 ) * goatee;
+		faceShade *= 1.0 - 0.03 * goatee;
 	}
 	diffuseColor.rgb *= faceShade;
 	normal = normalize( normal + ( viewMatrix * vec4( carve, 0.0 ) ).xyz );`,
@@ -455,6 +456,10 @@ void main() {`)
       `vec3 marbleNW = normalize( ( vec4( normal, 0.0 ) * viewMatrix ).xyz );
 	float marbleKeyLit = keyLight( vMarbleWorld, marbleNW );
 	vec3 marbleKeyView = ( viewMatrix * vec4( uKeyWorld, 1.0 ) ).xyz;
+	// the forehead just under the hair: the scan's hair stands out over it in a shelf whose shadow read as a
+	// dark band, so most of the shadow there is lifted
+	float browFill = vHead * smoothstep( 0.9, 0.922, lp.y ) * ( 1.0 - smoothstep( 0.952, 0.962, lp.y ) ) * smoothstep( 0.0, 0.03, lp.z );
+	marbleKeyLit = mix( marbleKeyLit, 1.0, 0.6 * browFill );
 	vec3 marbleRimView = ( viewMatrix * vec4( uRimWorld, 1.0 ) ).xyz;
 ${lights}`,
     )
