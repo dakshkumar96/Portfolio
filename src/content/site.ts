@@ -235,6 +235,8 @@ export const experience: Experience[] = [
     dates: "May 2026 to present",
     bullets: [
       "I run the society now. The year before, I was social media manager. I grew the Instagram by 112%, planned events, designed the posters and reels, and kept the content calendar going.",
+      "Launched a digital membership system with Apple Wallet cards, giving members discounts at local stores and guaranteed interviews with partner job agencies.",
+      "Lead a committee of 10 and run events that were firsts on campus, including the Night of Nations, a Cultural Fashion Show and a go karting Rush Rally.",
     ],
   },
   {
@@ -265,6 +267,13 @@ export const experience: Experience[] = [
       "Edited podcast episodes and cut trailers and shorts for YouTube, Instagram and TikTok.",
       "Ran SEO across platforms and designed the branding and thumbnails.",
     ],
+  },
+  {
+    slug: "freelance-video-editor",
+    org: "Freelance",
+    role: "Video Editor",
+    dates: "Since age 15",
+    bullets: ["Began editing videos at 13 and was freelancing by 15."],
   },
 ];
 

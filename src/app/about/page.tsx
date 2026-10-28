@@ -1,5 +1,6 @@
 import { Avatar } from "@/components/Avatar";
 import { CurveTitle } from "@/components/CurveTitle";
+import { MuseumObjects, MuseumPhotos } from "@/components/FromTheMuseum";
 import { about, facts } from "@/content/site";
 
 export const metadata = {
@@ -37,6 +38,22 @@ export default function AboutPage() {
             <li key={fact}>{fact}</li>
           ))}
         </ul>
+      </section>
+
+      <section>
+        <div className="section-head">
+          <h2>From the Museum</h2>
+          <p className="section-kicker">The photographs in the 3D hall, with their labels</p>
+        </div>
+        <MuseumPhotos />
+      </section>
+
+      <section>
+        <div className="section-head">
+          <h2>Things I&apos;m Into</h2>
+          <p className="section-kicker">The objects in the hall&apos;s glass cases</p>
+        </div>
+        <MuseumObjects />
       </section>
     </>
   );

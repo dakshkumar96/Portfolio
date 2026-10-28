@@ -5,7 +5,8 @@ import { usePathname } from "next/navigation";
 import { StarLogo } from "./StarLogo";
 
 const links = [
-  { href: "/", label: "Home" },
+  // the ordinary site's home; the star in the middle goes back into the 3D museum
+  { href: "/profile", label: "Home" },
   { href: "/about", label: "About" },
   { href: "/resume", label: "Resume" },
   { href: "/contact", label: "Contact" },
@@ -26,7 +27,7 @@ export function Nav() {
             {link.label}
           </Link>
         ))}
-        <Link href="/" className="nav-logo" aria-label="home">
+        <Link href="/" className="nav-logo" aria-label="Enter the 3D museum" title="Enter the 3D museum">
           <StarLogo />
         </Link>
         {links.slice(2).map((link) => (

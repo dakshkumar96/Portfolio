@@ -1204,3 +1204,115 @@ a {
 body:has(.museum-root) .starfield {
   display: none;
 }
+
+/* ------------------------------------------------------------------ */
+/* From the museum: its photographs, objects and art on the plain site */
+/* ------------------------------------------------------------------ */
+
+.moment-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 22px;
+}
+
+.moment,
+.art-piece {
+  margin: 0;
+  border-radius: 18px;
+  overflow: hidden;
+  background: #141414;
+  border: 1px solid #222;
+}
+
+.moment img,
+.art-piece img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.moment figcaption,
+.art-piece figcaption {
+  padding: 16px 18px 18px;
+}
+
+.moment h3,
+.interest h3,
+.art-piece h3 {
+  font-size: 16px;
+  font-weight: 600;
+  margin: 0 0 6px;
+  color: var(--text);
+}
+
+.moment p,
+.interest p,
+.art-piece p {
+  margin: 0;
+  color: #cfcfcf;
+  font-size: 14.5px;
+  line-height: 1.65;
+}
+
+.interest-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.interest {
+  padding: 18px 20px;
+  border-radius: 16px;
+  background: #141414;
+  border: 1px solid #222;
+}
+
+.interest p.interest-meta,
+.art-piece p.interest-meta {
+  margin-bottom: 8px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.art-piece p.art-detail {
+  margin-top: 6px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.art-section {
+  margin-top: 48px;
+}
+
+.art-heading {
+  margin: 0 0 18px;
+  font-size: 22px;
+}
+
+.art-grid {
+  display: grid;
+  gap: 20px;
+}
+
+.art-grid-posters {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.art-grid-thumbs {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.art-numbers {
+  color: #d6d6d6;
+  font-size: 16px;
+  line-height: 1.75;
+}
+
+@media (max-width: 760px) {
+  .moment-grid,
+  .interest-grid,
+  .art-grid-posters,
+  .art-grid-thumbs {
+    grid-template-columns: 1fr;
+  }
+}

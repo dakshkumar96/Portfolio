@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { ProjectArt } from "@/components/ProjectArt";
 import { getProject, projects } from "@/content/site";
 import { ExternalLink } from "@/components/ExternalLink";
+import { ArtGallery } from "@/components/FromTheMuseum";
 
 export function generateStaticParams() {
   return projects.map((project) => ({ slug: project.slug }));
@@ -25,7 +26,7 @@ export default async function WorkPage({ params }: PageProps<"/work/[slug]">) {
 
   return (
     <article>
-      <Link href="/" className="nav-link" style={{ display: "inline-block", marginBottom: 24 }}>
+      <Link href="/profile" className="nav-link" style={{ display: "inline-block", marginBottom: 24 }}>
         ← Home
       </Link>
       <div className="project-card" style={{ pointerEvents: "none", marginBottom: 28 }}>
@@ -67,6 +68,7 @@ export default async function WorkPage({ params }: PageProps<"/work/[slug]">) {
           ))}
         </div>
       </div>
+      {project.slug === "visual-work" ? <ArtGallery /> : null}
     </article>
   );
 }
