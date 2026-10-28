@@ -380,6 +380,16 @@ export function MuseumWorld() {
       />
 
       {/*
+        The way out of the 3D, to the ordinary site. Above the loading screen
+        as well as the hall, so nobody has to wait for the doors to open to
+        leave, and outside .museum-root for the same reason the veil is.
+      */}
+      <Link href="/profile" className="museum-skip">
+        Skip 3D
+        <span aria-hidden="true"> →</span>
+      </Link>
+
+      {/*
         One card, drawn while the museum loads and never seen.
 
         The first card anyone opened stalled the page for most of a second:

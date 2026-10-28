@@ -236,21 +236,7 @@ a {
   touch-action: none;
 }
 
-.museum-skip {
-  position: fixed;
-  top: 92px;
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 5;
-  color: var(--muted);
-  font-size: 13px;
-  opacity: 0.7;
-  transition: opacity 0.2s ease;
-}
-
-.museum-skip:hover {
-  opacity: 1;
-}
+/* placed and drawn in heritage.css, with the museum's other labels */
 
 /* the museum ("/") needs full viewport width, not the centered column */
 .museum-main {

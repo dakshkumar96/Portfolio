@@ -572,8 +572,50 @@
   outline-offset: 3px;
 }
 
+/*
+  Skip 3D: top right, clear of the room's name on the left, the hint at the
+  bottom and the sound switch in the corner, and above the loading screen
+  (z-index 40) so it can be used while the hall is still being built. A
+  small dark plate, like the hint's, so it reads over a lit wall.
+*/
+.museum-skip {
+  position: fixed;
+  top: 24px;
+  right: 28px;
+  z-index: 42;
+  display: inline-flex;
+  align-items: center;
+  min-height: 36px;
+  padding: 0 14px;
+  opacity: 0.9;
+  color: #dcc08a;
+  background: rgba(12, 8, 5, 0.72);
+  border: 1px solid rgba(200, 148, 74, 0.35);
+  text-decoration: none;
+}
+
+.museum-skip:hover,
+.museum-skip:focus-visible {
+  opacity: 1;
+  color: #f1e2bf;
+  border-color: rgba(220, 192, 138, 0.7);
+  text-decoration: none;
+}
+
+@media (max-width: 560px) {
+  .museum-skip {
+    top: 16px;
+    right: 16px;
+  }
+}
+
 /* under a finger the way back is a real button, a full finger high, not a line of small type */
 @media (hover: none) and (pointer: coarse) {
+  .museum-skip {
+    min-height: 44px;
+    font-size: 12px;
+    -webkit-tap-highlight-color: transparent;
+  }
   .museum-back {
     min-height: 44px;
     margin-top: 6px;
